@@ -112,7 +112,18 @@ class DuckDB:
             return conn.query(sql).fetchdf()
 
     def execute(self, sql: str, *args, **kwargs) -> None:
-        """Execute SQL without returning results."""
+        """Execute SQL without returning results.
+
+        This method can be used for any DuckDB SQL command, including:
+        - DDL statements (CREATE, DROP, ALTER)
+        - DML statements (INSERT, UPDATE, DELETE)
+        - DuckDB COPY commands for S3 writes (e.g., COPY ... TO 's3://...')
+
+        Args:
+            sql: SQL statement to execute
+            *args: Positional arguments passed to duckdb execute
+            **kwargs: Keyword arguments passed to duckdb execute
+        """
         with self._get_connection() as conn:
             conn.execute(sql, *args, **kwargs)
 
@@ -134,21 +145,39 @@ class DuckDB:
                 f'CREATE OR REPLACE TABLE {table_name} AS (SELECT * FROM temp_df)'
             )
 
-    def read_parquet_from_s3(self, bucket: str, key: str) -> pd.DataFrame:
-        """Read parquet from S3. Delegates to self.s3.read_df_from_parquet()."""
-        if self._s3 is None:
-            raise ValueError(
-                'S3 not configured. Pass s3= or S3 credentials to __init__'
-            )
-        return self._s3.read_df_from_parquet(bucket, key)
+    def read_parquet_from_s3(self, s3_uri: str) -> pd.DataFrame:
+        """Read parquet from S3.
 
-    def write_df_to_s3_parquet(self, df: pd.DataFrame, bucket: str, key: str) -> int:
-        """Write DataFrame to S3 as parquet. Delegates to self.s3.write_df_to_parquet()."""
+        Args:
+            s3_uri: S3 URI (e.g., 's3://bucket/path/file.parquet')
+
+        Returns:
+            DataFrame with parquet contents
+
+        Raises:
+            ValueError: If S3 is not configured
+        """
         if self._s3 is None:
             raise ValueError(
                 'S3 not configured. Pass s3= or S3 credentials to __init__'
             )
-        return self._s3.write_df_to_parquet(df, bucket, key)
+        return self._s3.read_df_from_parquet(s3_uri)
+
+    def write_df_to_s3_parquet(self, df: pd.DataFrame, s3_uri: str) -> None:
+        """Write DataFrame to S3 as parquet.
+
+        Args:
+            df: DataFrame to write
+            s3_uri: S3 URI (e.g., 's3://bucket/path/file.parquet')
+
+        Raises:
+            ValueError: If S3 is not configured
+        """
+        if self._s3 is None:
+            raise ValueError(
+                'S3 not configured. Pass s3= or S3 credentials to __init__'
+            )
+        self._s3.write_df_to_parquet(df, s3_uri)
 
     def __enter__(self) -> 'DuckDB':
         """Context manager entry."""
