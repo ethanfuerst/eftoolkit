@@ -1,12 +1,18 @@
 """Google Sheets client with automatic batching."""
 
+import logging
+import random
+import time
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import pandas as pd
 from gspread import service_account_from_dict
-from gspread.exceptions import WorksheetNotFound
+from gspread.exceptions import APIError, WorksheetNotFound
+
+T = TypeVar('T')
 
 
 class Worksheet:
@@ -218,6 +224,286 @@ class Worksheet:
             }
         )
 
+    def merge_cells(
+        self,
+        range_name: str,
+        merge_type: str = 'MERGE_ALL',
+    ) -> None:
+        """Queue cell merge.
+
+        Args:
+            range_name: A1 notation range to merge (e.g., 'A1:C1').
+            merge_type: One of 'MERGE_ALL', 'MERGE_COLUMNS', 'MERGE_ROWS'.
+        """
+        self._batch_requests.append(
+            {
+                'type': 'merge',
+                'range': range_name,
+                'merge_type': merge_type,
+            }
+        )
+
+    def unmerge_cells(
+        self,
+        range_name: str,
+    ) -> None:
+        """Queue cell unmerge.
+
+        Args:
+            range_name: A1 notation range to unmerge.
+        """
+        self._batch_requests.append(
+            {
+                'type': 'unmerge',
+                'range': range_name,
+            }
+        )
+
+    def sort_range(
+        self,
+        range_name: str,
+        sort_specs: list[dict[str, Any]],
+    ) -> None:
+        """Queue range sort.
+
+        Args:
+            range_name: A1 notation range to sort.
+            sort_specs: List of sort specifications. Each spec should have:
+                - 'column': 0-based column index within the range
+                - 'ascending': True for ascending, False for descending (default True)
+
+        Example:
+            ws.sort_range('A1:C10', [{'column': 0, 'ascending': True}])
+        """
+        self._batch_requests.append(
+            {
+                'type': 'sort',
+                'range': range_name,
+                'sort_specs': sort_specs,
+            }
+        )
+
+    def set_data_validation(
+        self,
+        range_name: str,
+        rule: dict[str, Any],
+    ) -> None:
+        """Queue data validation rule.
+
+        Args:
+            range_name: A1 notation range for validation.
+            rule: Validation rule dict. Common keys:
+                - 'type': 'ONE_OF_LIST', 'ONE_OF_RANGE', 'NUMBER_BETWEEN', etc.
+                - 'values': List of allowed values (for ONE_OF_LIST)
+                - 'showDropdown': True to show dropdown (default True)
+                - 'strict': True to reject invalid input (default True)
+
+        Example:
+            ws.set_data_validation('A1:A10', {
+                'type': 'ONE_OF_LIST',
+                'values': ['Yes', 'No', 'Maybe'],
+                'showDropdown': True,
+            })
+        """
+        self._batch_requests.append(
+            {
+                'type': 'data_validation',
+                'range': range_name,
+                'rule': rule,
+            }
+        )
+
+    def clear_data_validation(
+        self,
+        range_name: str,
+    ) -> None:
+        """Queue removal of data validation rules.
+
+        Args:
+            range_name: A1 notation range to clear validation from.
+        """
+        self._batch_requests.append(
+            {
+                'type': 'clear_data_validation',
+                'range': range_name,
+            }
+        )
+
+    def add_conditional_format(
+        self,
+        range_name: str,
+        rule: dict[str, Any],
+    ) -> None:
+        """Queue conditional formatting rule.
+
+        Args:
+            range_name: A1 notation range for conditional format.
+            rule: Conditional format rule dict. Should contain:
+                - 'type': 'CUSTOM_FORMULA', 'NUMBER_GREATER', 'TEXT_CONTAINS', etc.
+                - 'values': Condition values (e.g., formula string)
+                - 'format': Cell format to apply when condition is met
+
+        Example:
+            ws.add_conditional_format('A1:A10', {
+                'type': 'CUSTOM_FORMULA',
+                'values': ['=A1>100'],
+                'format': {'backgroundColor': {'red': 1, 'green': 0, 'blue': 0}},
+            })
+        """
+        self._batch_requests.append(
+            {
+                'type': 'conditional_format',
+                'range': range_name,
+                'rule': rule,
+            }
+        )
+
+    def insert_rows(
+        self,
+        start_row: int,
+        num_rows: int = 1,
+    ) -> None:
+        """Queue row insertion.
+
+        Args:
+            start_row: 1-based row index where new rows will be inserted.
+            num_rows: Number of rows to insert (default 1).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'insert_rows',
+                'start_row': start_row,
+                'num_rows': num_rows,
+            }
+        )
+
+    def delete_rows(
+        self,
+        start_row: int,
+        num_rows: int = 1,
+    ) -> None:
+        """Queue row deletion.
+
+        Args:
+            start_row: 1-based row index of first row to delete.
+            num_rows: Number of rows to delete (default 1).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'delete_rows',
+                'start_row': start_row,
+                'num_rows': num_rows,
+            }
+        )
+
+    def insert_columns(
+        self,
+        start_col: int,
+        num_cols: int = 1,
+    ) -> None:
+        """Queue column insertion.
+
+        Args:
+            start_col: 1-based column index where new columns will be inserted.
+            num_cols: Number of columns to insert (default 1).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'insert_columns',
+                'start_col': start_col,
+                'num_cols': num_cols,
+            }
+        )
+
+    def delete_columns(
+        self,
+        start_col: int,
+        num_cols: int = 1,
+    ) -> None:
+        """Queue column deletion.
+
+        Args:
+            start_col: 1-based column index of first column to delete.
+            num_cols: Number of columns to delete (default 1).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'delete_columns',
+                'start_col': start_col,
+                'num_cols': num_cols,
+            }
+        )
+
+    def freeze_rows(
+        self,
+        num_rows: int,
+    ) -> None:
+        """Queue freezing rows at the top of the worksheet.
+
+        Args:
+            num_rows: Number of rows to freeze (0 to unfreeze).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'freeze_rows',
+                'num_rows': num_rows,
+            }
+        )
+
+    def freeze_columns(
+        self,
+        num_cols: int,
+    ) -> None:
+        """Queue freezing columns at the left of the worksheet.
+
+        Args:
+            num_cols: Number of columns to freeze (0 to unfreeze).
+        """
+        self._batch_requests.append(
+            {
+                'type': 'freeze_columns',
+                'num_cols': num_cols,
+            }
+        )
+
+    def add_raw_request(
+        self,
+        request: dict[str, Any],
+    ) -> None:
+        """Queue a raw batchUpdate request.
+
+        Use this for operations not covered by other methods. The request
+        will be passed directly to the Google Sheets batchUpdate API.
+
+        Args:
+            request: A single batchUpdate request dict. See Google Sheets API
+                documentation for available request types:
+                https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request
+
+        Example:
+            # Add a named range
+            ws.add_raw_request({
+                'addNamedRange': {
+                    'namedRange': {
+                        'name': 'MyRange',
+                        'range': {
+                            'sheetId': 0,
+                            'startRowIndex': 0,
+                            'endRowIndex': 10,
+                            'startColumnIndex': 0,
+                            'endColumnIndex': 5,
+                        }
+                    }
+                }
+            })
+        """
+        self._batch_requests.append(
+            {
+                'type': 'raw',
+                'request': request,
+            }
+        )
+
     def flush(self) -> None:
         """Execute all queued operations.
 
@@ -239,17 +525,23 @@ class Worksheet:
 
         # Flush value updates via parent spreadsheet's batch update
         if self._value_updates:
-            self._spreadsheet._gspread_spreadsheet.values_batch_update(
-                {
-                    'valueInputOption': 'USER_ENTERED',
-                    'data': self._value_updates,
-                }
+            self._spreadsheet._execute_with_retry(
+                lambda: self._spreadsheet._gspread_spreadsheet.values_batch_update(
+                    {
+                        'valueInputOption': 'USER_ENTERED',
+                        'data': self._value_updates,
+                    }
+                ),
+                'values_batch_update',
             )
 
         # Flush batch requests (format, borders, etc.)
         for req in self._batch_requests:
             if req['type'] == 'format':
-                self._ws.format(req['range'], req['format'])
+                self._spreadsheet._execute_with_retry(
+                    lambda r=req: self._ws.format(r['range'], r['format']),
+                    'format',
+                )
 
     def _flush_to_preview(self) -> None:
         """Render queued operations to local HTML preview."""
@@ -312,7 +604,6 @@ class Spreadsheet:
         self._local_preview = local_preview
         self._preview_dir = Path(preview_dir)
         self._spreadsheet_name = spreadsheet_name
-        # TODO: Retry logic not yet implemented
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._gspread_spreadsheet = None
@@ -323,6 +614,41 @@ class Spreadsheet:
 
             gc = service_account_from_dict(credentials)
             self._gspread_spreadsheet = gc.open(spreadsheet_name)
+
+    def _execute_with_retry(self, func: Callable[[], T], description: str = '') -> T:
+        """Execute function with exponential backoff retry on transient errors.
+
+        Args:
+            func: Callable to execute.
+            description: Description for logging.
+
+        Returns:
+            Result of the function call.
+
+        Raises:
+            APIError: If max retries exhausted or non-retryable error.
+        """
+        retryable_status_codes = (429, 500, 502, 503, 504)
+
+        for attempt in range(self._max_retries + 1):
+            try:
+                return func()
+            except APIError as e:
+                status_code = e.response.status_code
+                if status_code not in retryable_status_codes:
+                    raise
+                if attempt == self._max_retries:
+                    raise
+                delay = self._base_delay * (2**attempt) + random.uniform(0, 1)
+                logging.warning(
+                    f'API error {status_code} on {description} '
+                    f'(attempt {attempt + 1}/{self._max_retries}). '
+                    f'Retrying in {delay:.2f}s...'
+                )
+                time.sleep(delay)
+
+        # This should never be reached, but satisfies type checker
+        raise RuntimeError('Unexpected state in retry loop')  # pragma: no cover
 
     def __enter__(self) -> 'Spreadsheet':
         """Context manager entry."""
@@ -367,7 +693,7 @@ class Spreadsheet:
         gspread_ws = self._gspread_spreadsheet.worksheet(name)
         return Worksheet(gspread_ws, self)
 
-    def worksheets(self) -> list[str]:
+    def get_worksheet_names(self) -> list[str]:
         """List all worksheet names.
 
         Returns:
