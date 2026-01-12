@@ -3,10 +3,14 @@
 import os
 from pathlib import Path
 
+import boto3
 import pandas as pd
 import pytest
+from moto import mock_aws
 
 from eftoolkit.sql import DuckDB
+
+TEST_BUCKET = 'test-bucket'
 
 
 @pytest.fixture
@@ -65,3 +69,15 @@ def s3_db(persistent_db, s3_test_dir):
         conn.execute("SET s3_secret_access_key='dummy';")
 
     return db
+
+
+@pytest.fixture
+def mock_s3_bucket():
+    """Create a mocked S3 bucket for testing.
+
+    Yields the bucket name for S3FileSystem tests.
+    """
+    with mock_aws():
+        conn = boto3.client('s3', region_name='us-east-1')
+        conn.create_bucket(Bucket=TEST_BUCKET)
+        yield TEST_BUCKET
