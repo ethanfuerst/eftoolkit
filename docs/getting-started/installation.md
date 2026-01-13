@@ -3,25 +3,20 @@
 ## Requirements
 
 - Python 3.10 or higher
-- pip, uv, or another Python package manager
+- uv, pip, or another Python package manager
 
 ## Install from PyPI
 
-!!! note "Not Yet Published"
-    This package is not yet available on PyPI. Use the source installation method below.
+=== "uv (recommended)"
 
-Once published, install with:
+    ```bash
+    uv add eftoolkit
+    ```
 
 === "pip"
 
     ```bash
     pip install eftoolkit
-    ```
-
-=== "uv"
-
-    ```bash
-    uv add eftoolkit
     ```
 
 ## Install from Source
@@ -52,14 +47,16 @@ Install only the modules you need:
 === "SQL only (DuckDB)"
 
     ```bash
-    pip install eftoolkit[sql-only]
+    uv add eftoolkit[sql-only]
+    # Or: pip install eftoolkit[sql-only]
     # Includes: pandas, duckdb
     ```
 
 === "S3 only"
 
     ```bash
-    pip install eftoolkit[s3-only]
+    uv add eftoolkit[s3-only]
+    # Or: pip install eftoolkit[s3-only]
     # Includes: pandas, s3fs, pyarrow
     ```
 

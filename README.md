@@ -1,23 +1,29 @@
 # eftoolkit
 
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ethanfuerst.github.io/eftoolkit/)
+[![PyPI version](https://img.shields.io/pypi/v/eftoolkit.svg)](https://pypi.org/project/eftoolkit/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ethanfuerst.github.io/eftoolkit/)
 
 A streamlined Python toolkit for everyday programming tasks and utilities.
 
 **[Documentation](https://ethanfuerst.github.io/eftoolkit/)** | [Installation](https://ethanfuerst.github.io/eftoolkit/getting-started/installation/) | [Quickstart](https://ethanfuerst.github.io/eftoolkit/getting-started/quickstart/)
 
-## Status
-
-**Work in Progress** - This package is under active development and **not yet published to PyPI**. APIs may change without notice.
-
 ## Installation
 
-This package is not yet on PyPI. Install from source:
+```bash
+uv add eftoolkit
+```
+
+Or with pip:
 
 ```bash
-# Clone and install with dev dependencies
+pip install eftoolkit
+```
+
+For development:
+
+```bash
 git clone https://github.com/ethanfuerst/eftoolkit.git
 cd eftoolkit
 uv sync
@@ -56,21 +62,6 @@ ws = ss.worksheet('Sheet1')
 ws.write_dataframe(df)
 ws.flush()
 ws.open_preview()  # Opens HTML in browser
-```
-
-## Examples
-
-See the [`examples/`](examples/) directory for detailed usage examples:
-
-- **[`basic_duckdb.py`](examples/basic_duckdb.py)** - DuckDB queries, table creation, DataFrame integration
-- **[`s3_operations.py`](examples/s3_operations.py)** - S3 read/write with moto mock (no credentials needed)
-- **[`google_sheets.py`](examples/google_sheets.py)** - Google Sheets operations (uses local preview if no credentials)
-
-Run an example:
-```bash
-uv run python examples/basic_duckdb.py
-uv run python examples/s3_operations.py      # Uses moto mock
-uv run python examples/google_sheets.py      # Local preview, or set GOOGLE_CREDENTIALS_PATH for live
 ```
 
 ## Development
@@ -116,15 +107,6 @@ eftoolkit/
 │   ├── s3/             # S3FileSystem for parquet read/write
 │   ├── gsheets/        # Google Sheets client with batching
 │   └── config/         # Configuration utilities
-├── examples/           # Usage examples (see above)
-├── tests/              # pytest test suite
-└── example_usage/      # Reference code from other projects (read-only)
+├── docs/               # Documentation (MkDocs)
+└── tests/              # pytest test suite
 ```
-
-### About `example_usage/`
-
-The `example_usage/` directory contains reference code extracted from real projects
-(`boxoffice_tracking`, `boxoffice_drafting`, `ynab_report`). This code demonstrates
-production patterns that informed eftoolkit's design. It is **read-only reference
-material** and excluded from linting/formatting. The patterns from these projects
-are documented in `examples/` with cleaner, standalone examples.
