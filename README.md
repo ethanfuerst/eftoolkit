@@ -3,11 +3,11 @@
 [![PyPI version](https://img.shields.io/pypi/v/eftoolkit.svg)](https://pypi.org/project/eftoolkit/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ethanfuerst.github.io/eftoolkit/)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://tidbitstatistics.com/eftoolkit/)
 
 A streamlined Python toolkit for everyday programming tasks and utilities.
 
-**[Documentation](https://ethanfuerst.github.io/eftoolkit/)** | [Installation](https://ethanfuerst.github.io/eftoolkit/getting-started/installation/) | [Quickstart](https://ethanfuerst.github.io/eftoolkit/getting-started/quickstart/)
+**[Documentation](https://tidbitstatistics.com/eftoolkit/)** | [Installation](https://tidbitstatistics.com/eftoolkit/getting-started/installation/) | [Quickstart](https://tidbitstatistics.com/eftoolkit/getting-started/quickstart/)
 
 ## Installation
 

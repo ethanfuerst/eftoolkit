@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://ethanfuerst.github.io/eftoolkit/"
+Documentation = "https://tidbitstatistics.com/eftoolkit/"
 Homepage = "https://github.com/ethanfuerst/eftoolkit"
 Repository = "https://github.com/ethanfuerst/eftoolkit"
 Issues = "https://github.com/ethanfuerst/eftoolkit/issues"
