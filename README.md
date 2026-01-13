@@ -90,7 +90,22 @@ uv run pytest --cov=eftoolkit --cov-report=term-missing
 
 # Coverage report
 uv run coverage report -m
+
+# Build documentation locally
+uv run mkdocs serve
 ```
+
+## Releasing (Maintainers Only)
+
+Releases are automated via the release script. You must be on the `main` branch with no uncommitted changes:
+
+```bash
+./scripts/release.sh patch  # 0.1.0 -> 0.1.1
+./scripts/release.sh minor  # 0.1.0 -> 0.2.0
+./scripts/release.sh major  # 0.1.0 -> 1.0.0
+```
+
+This runs all checks, auto-bumps the version, generates release notes, and triggers the PyPI publish workflow.
 
 ## Project Structure
 
