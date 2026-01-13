@@ -25,8 +25,9 @@ from eftoolkit.s3 import S3FileSystem
 from eftoolkit.gsheets import Spreadsheet
 
 # DuckDB with in-memory database
-db = DuckDB(database=':memory:')
-df = db.query('SELECT 1 as num')
+db = DuckDB()
+db.create_table('users', "SELECT 1 as id, 'Alice' as name")
+df = db.get_table('users')
 
 # S3 operations (requires credentials)
 s3 = S3FileSystem(
@@ -34,13 +35,36 @@ s3 = S3FileSystem(
     secret_access_key='...',
     region='us-east-1',
 )
-s3.write_df_to_parquet(df, 'my-bucket', 'data/output')
+s3.write_df_to_parquet(df, 's3://my-bucket/data/output.parquet')
 
 # Google Sheets (requires service account credentials)
-spreadsheet = Spreadsheet(credentials={...}, spreadsheet_name='My Sheet')
-ws = spreadsheet.worksheet('Sheet1')
+ss = Spreadsheet(credentials={...}, spreadsheet_name='My Sheet')
+with ss.worksheet('Sheet1') as ws:
+    ws.write_dataframe(df)
+    ws.format_range('A1:B1', {'textFormat': {'bold': True}})
+    # flush() called automatically on exit
+
+# Google Sheets local preview (no credentials needed!)
+ss = Spreadsheet(local_preview=True, spreadsheet_name='Preview')
+ws = ss.worksheet('Sheet1')
 ws.write_dataframe(df)
 ws.flush()
+ws.open_preview()  # Opens HTML in browser
+```
+
+## Examples
+
+See the [`examples/`](examples/) directory for detailed usage examples:
+
+- **[`basic_duckdb.py`](examples/basic_duckdb.py)** - DuckDB queries, table creation, DataFrame integration
+- **[`s3_operations.py`](examples/s3_operations.py)** - S3 read/write with moto mock (no credentials needed)
+- **[`google_sheets.py`](examples/google_sheets.py)** - Google Sheets operations (uses local preview if no credentials)
+
+Run an example:
+```bash
+uv run python examples/basic_duckdb.py
+uv run python examples/s3_operations.py      # Uses moto mock
+uv run python examples/google_sheets.py      # Local preview, or set GOOGLE_CREDENTIALS_PATH for live
 ```
 
 ## Development
@@ -61,3 +85,25 @@ uv run pytest --cov=eftoolkit --cov-report=term-missing
 # Coverage report
 uv run coverage report -m
 ```
+
+## Project Structure
+
+```
+eftoolkit/
+├── eftoolkit/          # Main package
+│   ├── sql/            # DuckDB wrapper with S3 integration
+│   ├── s3/             # S3FileSystem for parquet read/write
+│   ├── gsheets/        # Google Sheets client with batching
+│   └── config/         # Configuration utilities
+├── examples/           # Usage examples (see above)
+├── tests/              # pytest test suite
+└── example_usage/      # Reference code from other projects (read-only)
+```
+
+### About `example_usage/`
+
+The `example_usage/` directory contains reference code extracted from real projects
+(`boxoffice_tracking`, `boxoffice_drafting`, `ynab_report`). This code demonstrates
+production patterns that informed eftoolkit's design. It is **read-only reference
+material** and excluded from linting/formatting. The patterns from these projects
+are documented in `examples/` with cleaner, standalone examples.
