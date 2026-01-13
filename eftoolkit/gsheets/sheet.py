@@ -12,6 +12,8 @@ import pandas as pd
 from gspread import service_account_from_dict
 from gspread.exceptions import APIError, WorksheetNotFound
 
+from eftoolkit.gsheets.utils import parse_cell_reference
+
 T = TypeVar('T')
 
 
@@ -47,6 +49,9 @@ class Worksheet:
         self._preview_output = preview_output or Path('sheet_preview.html')
         self._value_updates: list[dict] = []
         self._batch_requests: list[dict] = []
+        self._preview_history: list[dict] = []  # Accumulates all writes for preview
+        self._preview_column_widths: dict[int, int] = {}  # col_index -> width in pixels
+        self._preview_notes: dict[tuple[int, int], str] = {}  # (row, col) -> note text
 
     def __enter__(self) -> 'Worksheet':
         """Context manager entry."""
@@ -544,23 +549,143 @@ class Worksheet:
                 )
 
     def _flush_to_preview(self) -> None:
-        """Render queued operations to local HTML preview."""
-        html = ['<html><head><style>']
-        html.append('table { border-collapse: collapse; }')
-        html.append('td, th { border: 1px solid #ccc; padding: 4px 8px; }')
-        html.append('</style></head><body>')
-        html.append(f'<h1>Sheet Preview: {self.title}</h1>')
+        """Render queued operations to local HTML preview as a unified grid."""
+        # Accumulate current updates into history
+        self._preview_history.extend(self._value_updates)
 
-        for update in self._value_updates:
-            html.append(f'<h2>{update["range"]}</h2>')
-            html.append('<table>')
-            for row in update['values']:
-                html.append('<tr>')
-                for cell in row:
-                    html.append(f'<td>{cell}</td>')
-                html.append('</tr>')
-            html.append('</table>')
+        # Process batch requests for preview metadata
+        for req in self._batch_requests:
+            if req['type'] == 'column_width':
+                col = req['column']
+                # Convert letter to index if needed
+                if isinstance(col, str):
+                    col_idx = 0
+                    for char in col.upper():
+                        col_idx = col_idx * 26 + (ord(char) - ord('A') + 1)
+                    col_idx -= 1
+                else:
+                    col_idx = col - 1  # Convert 1-indexed to 0-indexed
+                self._preview_column_widths[col_idx] = req['width']
+            elif req['type'] == 'notes':
+                for cell_ref, note_text in req['notes'].items():
+                    row, col = parse_cell_reference(cell_ref)
+                    self._preview_notes[(row, col)] = note_text
 
+        # Build a sparse grid from all updates
+        grid: dict[tuple[int, int], str] = {}
+        max_row = 0
+        max_col = 0
+
+        for update in self._preview_history:
+            start_row, start_col = parse_cell_reference(update['range'])
+            for row_offset, row_data in enumerate(update['values']):
+                for col_offset, cell_value in enumerate(row_data):
+                    r = start_row + row_offset
+                    c = start_col + col_offset
+                    grid[(r, c)] = str(cell_value) if cell_value is not None else ''
+                    max_row = max(max_row, r)
+                    max_col = max(max_col, c)
+
+        # Generate column headers (A, B, C, ... AA, AB, etc.)
+        def col_to_letter(col_idx: int) -> str:
+            result = ''
+            col_idx += 1  # Convert to 1-indexed
+            while col_idx > 0:
+                col_idx, remainder = divmod(col_idx - 1, 26)
+                result = chr(ord('A') + remainder) + result
+            return result
+
+        # Build HTML with Google Sheets-like styling
+        html = ['<!DOCTYPE html><html><head>']
+        html.append('<meta charset="utf-8">')
+        html.append(f'<title>{self.title}</title>')
+        html.append('<style>')
+        html.append(
+            'body { font-family: Arial, sans-serif; margin: 0; padding: 20px; '
+            'background-color: #f8f9fa; }'
+        )
+        html.append(
+            'h1 { color: #202124; font-size: 18px; font-weight: 400; '
+            'margin-bottom: 16px; }'
+        )
+        html.append(
+            '.sheet-container { background: white; border-radius: 8px; '
+            'box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: auto; }'
+        )
+        html.append('table { border-collapse: collapse; border-spacing: 0; }')
+        html.append(
+            'td, th { border: 1px solid #e0e0e0; padding: 4px 8px; '
+            'font-size: 13px; vertical-align: middle; '
+            'white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }'
+        )
+        html.append(
+            'th { background-color: #f8f9fa; color: #5f6368; '
+            'font-weight: 500; text-align: center; position: sticky; top: 0; }'
+        )
+        html.append(
+            '.row-header { background-color: #f8f9fa; color: #5f6368; '
+            'font-weight: 500; text-align: center; min-width: 46px; '
+            'position: sticky; left: 0; }'
+        )
+        html.append(
+            '.corner { background-color: #f8f9fa; position: sticky; '
+            'top: 0; left: 0; z-index: 2; }'
+        )
+        html.append(
+            'td { background-color: white; text-align: left; min-width: 80px; }'
+        )
+        html.append('.has-note { background-color: #fff8e1; cursor: help; }')
+        html.append(
+            '.has-note::after { content: ""; position: absolute; '
+            'top: 0; right: 0; border-width: 0 6px 6px 0; '
+            'border-style: solid; border-color: #ffc107 #ffc107 '
+            'transparent transparent; }'
+        )
+        html.append('td { position: relative; }')
+        html.append('</style>')
+        html.append('</head><body>')
+        html.append(f'<h1>📊 {self.title}</h1>')
+        html.append('<div class="sheet-container">')
+        html.append('<table>')
+
+        # Header row with column letters
+        html.append('<tr>')
+        html.append('<th class="corner"></th>')  # Corner cell
+        for c in range(max_col + 1):
+            width = self._preview_column_widths.get(c, 80)
+            html.append(
+                f'<th style="width: {width}px; min-width: {width}px;">'
+                f'{col_to_letter(c)}</th>'
+            )
+        html.append('</tr>')
+
+        # Data rows
+        for r in range(max_row + 1):
+            html.append('<tr>')
+            html.append(f'<td class="row-header">{r + 1}</td>')
+            for c in range(max_col + 1):
+                cell_value = grid.get((r, c), '')
+                note = self._preview_notes.get((r, c))
+                width = self._preview_column_widths.get(c, 80)
+                style = f'width: {width}px; max-width: {width}px;'
+                if note:
+                    # Escape HTML in note text
+                    escaped_note = (
+                        note.replace('&', '&amp;')
+                        .replace('"', '&quot;')
+                        .replace('<', '&lt;')
+                        .replace('>', '&gt;')
+                    )
+                    html.append(
+                        f'<td class="has-note" style="{style}" '
+                        f'title="{escaped_note}">{cell_value}</td>'
+                    )
+                else:
+                    html.append(f'<td style="{style}">{cell_value}</td>')
+            html.append('</tr>')
+
+        html.append('</table>')
+        html.append('</div>')
         html.append('</body></html>')
 
         self._preview_output.parent.mkdir(parents=True, exist_ok=True)
@@ -589,7 +714,7 @@ class Spreadsheet:
         max_retries: int = 5,
         base_delay: float = 2.0,
         local_preview: bool = False,
-        preview_dir: str | Path = 'sheet_previews',
+        preview_dir: str | Path = 'gsheets_preview',
     ) -> None:
         """Initialize Spreadsheet client.
 
@@ -607,6 +732,7 @@ class Spreadsheet:
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._gspread_spreadsheet = None
+        self._preview_worksheets: dict[str, Worksheet] = {}  # Cache for preview mode
 
         if not local_preview:
             if not credentials:
@@ -682,13 +808,15 @@ class Spreadsheet:
             WorksheetNotFound: If worksheet doesn't exist (not in local_preview mode).
         """
         if self._local_preview:
-            return Worksheet(
-                None,
-                self,
-                local_preview=True,
-                preview_output=self._preview_path_for_worksheet(name),
-                worksheet_name=name,
-            )
+            if name not in self._preview_worksheets:
+                self._preview_worksheets[name] = Worksheet(
+                    None,
+                    self,
+                    local_preview=True,
+                    preview_output=self._preview_path_for_worksheet(name),
+                    worksheet_name=name,
+                )
+            return self._preview_worksheets[name]
 
         gspread_ws = self._gspread_spreadsheet.worksheet(name)
         return Worksheet(gspread_ws, self)
@@ -719,13 +847,15 @@ class Spreadsheet:
             Worksheet instance for the new tab.
         """
         if self._local_preview:
-            return Worksheet(
-                None,
-                self,
-                local_preview=True,
-                preview_output=self._preview_path_for_worksheet(name),
-                worksheet_name=name,
-            )
+            if name not in self._preview_worksheets:
+                self._preview_worksheets[name] = Worksheet(
+                    None,
+                    self,
+                    local_preview=True,
+                    preview_output=self._preview_path_for_worksheet(name),
+                    worksheet_name=name,
+                )
+            return self._preview_worksheets[name]
 
         if replace:
             self.delete_worksheet(name, ignore_missing=True)

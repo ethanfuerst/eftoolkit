@@ -56,6 +56,16 @@ def test_spreadsheet_worksheet_local_preview():
     assert ws._worksheet_name == 'Sheet1'
 
 
+def test_spreadsheet_worksheet_local_preview_returns_cached():
+    """worksheet() returns same Worksheet instance when called twice."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+
+    ws1 = ss.worksheet('Sheet1')
+    ws2 = ss.worksheet('Sheet1')
+
+    assert ws1 is ws2
+
+
 def test_spreadsheet_worksheet_returns_worksheet():
     """worksheet() returns Worksheet wrapping gspread worksheet."""
     mock_gspread = MagicMock()
@@ -108,6 +118,16 @@ def test_spreadsheet_create_worksheet_local_preview():
 
     assert ws.is_local_preview is True
     assert ws._worksheet_name == 'NewSheet'
+
+
+def test_spreadsheet_create_worksheet_local_preview_returns_cached():
+    """create_worksheet() returns same Worksheet instance when called twice."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+
+    ws1 = ss.create_worksheet('NewSheet')
+    ws2 = ss.create_worksheet('NewSheet')
+
+    assert ws1 is ws2
 
 
 def test_spreadsheet_create_worksheet_without_replace():

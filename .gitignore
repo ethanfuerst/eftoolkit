@@ -83,4 +83,4 @@ credentials.json
 # Project-specific
 poetry.lock
 sheet_preview.html
-sheet_previews/
+gsheets_preview/
