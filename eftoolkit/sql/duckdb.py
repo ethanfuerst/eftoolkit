@@ -107,11 +107,25 @@ class DuckDB:
         return df.replace([float('inf'), float('-inf'), float('nan')], None)
 
     def query(self, sql: str) -> pd.DataFrame:
-        """Execute SQL and return DataFrame."""
+        """Execute SQL and return DataFrame.
+
+        Args:
+            sql: SQL query to execute.
+
+        Returns:
+            DataFrame containing the query results.
+
+        Example:
+            >>> db = DuckDB()
+            >>> df = db.query("SELECT 1 as id, 'Alice' as name")
+            >>> print(df)
+               id   name
+            0   1  Alice
+        """
         with self._get_connection() as conn:
             return conn.query(sql).fetchdf()
 
-    def execute(self, sql: str, *args, **kwargs) -> None:
+    def execute(self, sql: str, *args: object, **kwargs: object) -> None:
         """Execute SQL without returning results.
 
         This method can be used for any DuckDB SQL command, including:
@@ -120,25 +134,61 @@ class DuckDB:
         - DuckDB COPY commands for S3 writes (e.g., COPY ... TO 's3://...')
 
         Args:
-            sql: SQL statement to execute
-            *args: Positional arguments passed to duckdb execute
-            **kwargs: Keyword arguments passed to duckdb execute
+            sql: SQL statement to execute.
+            *args: Positional arguments passed to duckdb execute.
+            **kwargs: Keyword arguments passed to duckdb execute.
         """
         with self._get_connection() as conn:
             conn.execute(sql, *args, **kwargs)
 
     def get_table(self, table_name: str, where: str | None = None) -> pd.DataFrame:
-        """SELECT * FROM table with optional WHERE clause. Cleans inf/nan to None."""
+        """SELECT * FROM table with optional WHERE clause.
+
+        Automatically cleans inf/nan values to None.
+
+        Args:
+            table_name: Name of the table to query.
+            where: Optional WHERE clause (without 'WHERE' keyword).
+
+        Returns:
+            DataFrame with table contents.
+
+        Example:
+            >>> db = DuckDB()
+            >>> db.create_table('users', "SELECT 1 as id, 'Alice' as name")
+            >>> df = db.get_table('users')
+            >>> filtered = db.get_table('users', where="id = 1")
+        """
         where_clause = f' WHERE {where}' if where else ''
         df = self.query(f'SELECT * FROM {table_name}{where_clause}')
         return self._clean_df(df)
 
     def create_table(self, table_name: str, sql: str) -> None:
-        """CREATE OR REPLACE TABLE from SQL."""
+        """CREATE OR REPLACE TABLE from SQL.
+
+        Args:
+            table_name: Name for the new table.
+            sql: SQL SELECT statement to define table contents.
+
+        Example:
+            >>> db = DuckDB()
+            >>> db.create_table('active_users', "SELECT * FROM users WHERE active = true")
+        """
         self.execute(f'CREATE OR REPLACE TABLE {table_name} AS ({sql})')
 
     def create_table_from_df(self, table_name: str, df: pd.DataFrame) -> None:
-        """CREATE OR REPLACE TABLE from DataFrame."""
+        """CREATE OR REPLACE TABLE from DataFrame.
+
+        Args:
+            table_name: Name for the new table.
+            df: DataFrame to store as a table.
+
+        Example:
+            >>> import pandas as pd
+            >>> db = DuckDB()
+            >>> df = pd.DataFrame({'id': [1, 2], 'name': ['Alice', 'Bob']})
+            >>> db.create_table_from_df('users', df)
+        """
         with self._get_connection() as conn:
             conn.register('temp_df', df)
             conn.execute(

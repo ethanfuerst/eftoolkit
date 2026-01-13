@@ -20,6 +20,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+keywords = ["duckdb", "s3", "google-sheets", "pandas", "data-engineering", "toolkit"]
 dependencies = [
     "pandas>=2.0",
     "duckdb>=1.0",
@@ -27,6 +28,12 @@ dependencies = [
     "s3fs>=2024.0",
     "pyarrow>=15.0",
 ]
+
+[project.urls]
+Documentation = "https://ethanfuerst.github.io/eftoolkit/"
+Homepage = "https://github.com/ethanfuerst/eftoolkit"
+Repository = "https://github.com/ethanfuerst/eftoolkit"
+Issues = "https://github.com/ethanfuerst/eftoolkit/issues"
 
 [project.optional-dependencies]
 sql-only = [
@@ -46,6 +53,9 @@ dev = [
     "moto[s3]>=4.0",
     "boto3>=1.34",
     "python-dotenv>=1.0",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -79,7 +89,7 @@ skip-magic-trailing-comma = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=eftoolkit --cov-report=term-missing"
+addopts = "--cov=eftoolkit --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["eftoolkit"]

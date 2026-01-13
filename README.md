@@ -1,6 +1,12 @@
 # eftoolkit
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ethanfuerst.github.io/eftoolkit/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A streamlined Python toolkit for everyday programming tasks and utilities.
+
+**[Documentation](https://ethanfuerst.github.io/eftoolkit/)** | [Installation](https://ethanfuerst.github.io/eftoolkit/getting-started/installation/) | [Quickstart](https://ethanfuerst.github.io/eftoolkit/getting-started/quickstart/)
 
 ## Status
 
@@ -84,7 +90,22 @@ uv run pytest --cov=eftoolkit --cov-report=term-missing
 
 # Coverage report
 uv run coverage report -m
+
+# Build documentation locally
+uv run mkdocs serve
 ```
+
+## Releasing (Maintainers Only)
+
+Releases are automated via the release script. You must be on the `main` branch with no uncommitted changes:
+
+```bash
+./scripts/release.sh patch  # 0.1.0 -> 0.1.1
+./scripts/release.sh minor  # 0.1.0 -> 0.2.0
+./scripts/release.sh major  # 0.1.0 -> 1.0.0
+```
+
+This runs all checks, auto-bumps the version, generates release notes, and triggers the PyPI publish workflow.
 
 ## Project Structure
 

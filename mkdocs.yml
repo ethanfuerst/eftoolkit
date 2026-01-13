@@ -1,0 +1,106 @@
+site_name: eftoolkit
+site_url: https://ethanfuerst.github.io/eftoolkit/
+site_description: A streamlined Python toolkit for DuckDB, S3, and Google Sheets
+site_author: Ethan Fuerst
+repo_name: ethanfuerst/eftoolkit
+repo_url: https://github.com/ethanfuerst/eftoolkit
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - User Guide:
+      - Overview: user-guide/index.md
+      - DuckDB Wrapper: user-guide/duckdb.md
+      - S3 Operations: user-guide/s3.md
+      - Google Sheets: user-guide/gsheets.md
+      - Configuration Utilities: user-guide/config.md
+  - How-To Guides:
+      - Recipes: how-to/index.md
+  - API Reference:
+      - Overview: api/index.md
+      - eftoolkit.sql: api/sql.md
+      - eftoolkit.s3: api/s3.md
+      - eftoolkit.gsheets: api/gsheets.md
+      - eftoolkit.config: api/config.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Changelog: development/changelog.md
+      - Building Docs: DEVELOPMENT.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            signature_crossrefs: true
+            show_signature_annotations: true
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ethanfuerst
+  version:
+    provider: mike
