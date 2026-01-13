@@ -26,7 +26,7 @@ class Worksheet:
 
     def __init__(
         self,
-        gspread_worksheet,
+        gspread_worksheet: Any,
         spreadsheet: 'Spreadsheet',
         *,
         local_preview: bool = False,

@@ -84,3 +84,6 @@ credentials.json
 poetry.lock
 sheet_preview.html
 gsheets_preview/
+
+# Documentation build output
+site/

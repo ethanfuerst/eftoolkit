@@ -5,8 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from eftoolkit.gsheets import Spreadsheet
-
-from .conftest import create_api_error
+from tests.gsheets.conftest import create_api_error
 
 
 def test_retry_on_429_error():
