@@ -39,12 +39,6 @@ with ss.worksheet('Sheet1') as ws:
     ws.format_range('A1:B1', {'textFormat': {'bold': True}})
 ```
 
-## Status
-
-!!! warning "Work in Progress"
-    This package is under active development and not yet published to PyPI.
-    APIs may change without notice.
-
 ## Getting Started
 
 Ready to get started? Check out the [Installation](getting-started/installation.md) guide and [Quickstart](getting-started/quickstart.md) tutorial.
