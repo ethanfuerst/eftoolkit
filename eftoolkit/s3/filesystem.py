@@ -12,34 +12,86 @@ from botocore.exceptions import ClientError
 
 
 @dataclass(frozen=True)
+class S3ObjectMetadata:
+    """Metadata for an S3 object from boto3 response.
+
+    Attributes:
+        is_prefix: True if this represents a prefix/directory, not an actual object
+        last_modified_timestamp_utc: When the object was last modified (UTC)
+        size: Object size in bytes
+        etag: Object ETag hash
+        storage_class: S3 storage class (STANDARD, GLACIER, etc.)
+    """
+
+    is_prefix: bool = False
+    last_modified_timestamp_utc: datetime | None = None
+    size: int | None = None
+    etag: str | None = None
+    storage_class: str | None = None
+
+    def items(self):
+        """Yield key-value pairs of metadata fields.
+
+        Enables dict(metadata.items()) and `for k, v in metadata.items()`.
+        """
+        yield ('is_prefix', self.is_prefix)
+        yield ('last_modified_timestamp_utc', self.last_modified_timestamp_utc)
+        yield ('size', self.size)
+        yield ('etag', self.etag)
+        yield ('storage_class', self.storage_class)
+
+    def __iter__(self):
+        """Allow dict(metadata) to work by yielding key-value pairs."""
+        yield from self.items()
+
+    @classmethod
+    def from_boto_response(
+        cls, obj: dict, *, is_prefix: bool = False
+    ) -> 'S3ObjectMetadata':
+        """Create S3ObjectMetadata from boto3 list_objects_v2 response dict."""
+        return cls(
+            is_prefix=is_prefix,
+            last_modified_timestamp_utc=obj.get('LastModified'),
+            size=obj.get('Size'),
+            etag=obj.get('ETag', '').strip('"') if obj.get('ETag') else None,
+            storage_class=obj.get('StorageClass'),
+        )
+
+
+@dataclass(frozen=True)
 class S3Object:
-    """Metadata for an S3 object.
+    """Represents an S3 object with its location and metadata.
 
     Attributes:
         key: Object key (path within bucket)
-        last_modified: When the object was last modified
-        size: Object size in bytes
-        etag: Object ETag hash
+        bucket: Bucket name
+        uri: Full S3 URI (s3://bucket/key)
+        metadata: Object metadata (size, last_modified, etc.)
     """
 
     key: str
-    last_modified: datetime | None = None
-    size: int | None = None
-    etag: str | None = None
+    bucket: str
+    metadata: S3ObjectMetadata
+
+    @property
+    def uri(self) -> str:
+        """Return the full S3 URI."""
+        return f's3://{self.bucket}/{self.key}'
 
     @classmethod
-    def from_boto_response(cls, obj: dict) -> 'S3Object':
+    def from_boto_response(
+        cls, obj: dict, *, bucket: str, is_prefix: bool = False
+    ) -> 'S3Object':
         """Create S3Object from boto3 list_objects_v2 response dict."""
         return cls(
             key=obj['Key'],
-            last_modified=obj.get('LastModified'),
-            size=obj.get('Size'),
-            etag=obj.get('ETag', '').strip('"'),
+            bucket=bucket,
+            metadata=S3ObjectMetadata.from_boto_response(obj, is_prefix=is_prefix),
         )
 
     def __str__(self) -> str:
-        """Return the object key."""
-        return self.key
+        """Return the full S3 URI."""
+        return self.uri
 
 
 def _parse_s3_uri(s3_uri: str) -> tuple[str, str]:
@@ -292,16 +344,25 @@ class S3FileSystem:
                 return False
             raise
 
-    def ls(self, s3_uri: str, *, recursive: bool = True) -> Iterator[S3Object]:
+    def ls(
+        self,
+        s3_uri: str,
+        *,
+        recursive: bool = True,
+        include_prefixes: bool = False,
+    ) -> Iterator[S3Object]:
         """List objects at an S3 URI.
 
         Args:
             s3_uri: S3 URI (e.g., 's3://bucket' or 's3://bucket/prefix')
             recursive: If True, list all objects under prefix recursively.
-                If False, list only files at the immediate level (no subdirectories).
+                If False, list only files at the immediate level.
+            include_prefixes: If True and recursive=False, also yield prefix
+                (directory) entries with is_prefix=True in metadata.
+                Ignored when recursive=True.
 
         Yields:
-            S3Object instances with metadata for each file
+            S3Object instances with metadata for each file (and prefix if requested)
         """
         bucket, prefix = _parse_s3_uri(s3_uri)
         client = self._get_client()
@@ -314,9 +375,9 @@ class S3FileSystem:
 
             for page in paginator.paginate(**paginate_params):
                 for obj in page.get('Contents', []):
-                    yield S3Object.from_boto_response(obj)
+                    yield S3Object.from_boto_response(obj, bucket=bucket)
         else:
-            # Non-recursive: use delimiter to get only immediate files
+            # Non-recursive: use delimiter to get only immediate files/prefixes
             normalized_prefix = prefix.rstrip('/') + '/' if prefix else ''
             paginator = client.get_paginator('list_objects_v2')
             paginate_params = {
@@ -326,6 +387,15 @@ class S3FileSystem:
             }
 
             for page in paginator.paginate(**paginate_params):
-                # Only yield files at this level (skip CommonPrefixes/directories)
+                # Yield files at this level
                 for obj in page.get('Contents', []):
-                    yield S3Object.from_boto_response(obj)
+                    yield S3Object.from_boto_response(obj, bucket=bucket)
+
+                # Optionally yield prefixes (directories)
+                if include_prefixes:
+                    for prefix_entry in page.get('CommonPrefixes', []):
+                        yield S3Object(
+                            key=prefix_entry['Prefix'],
+                            bucket=bucket,
+                            metadata=S3ObjectMetadata(is_prefix=True),
+                        )
