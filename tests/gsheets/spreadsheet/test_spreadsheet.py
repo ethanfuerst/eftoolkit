@@ -227,3 +227,144 @@ def test_preview_path_sanitizes_names():
 
     assert '/' not in path.name
     assert ' ' not in path.name
+
+
+def test_spreadsheet_context_manager_flushes_worksheets(tmp_path):
+    """Spreadsheet context manager flushes all accessed worksheets on exit."""
+    with patch('webbrowser.open'):  # Suppress browser opening
+        with Spreadsheet(
+            local_preview=True, spreadsheet_name='Test', preview_dir=str(tmp_path)
+        ) as ss:
+            ws1 = ss.worksheet('Sheet1')
+            ws1.write_values('A1', [['data1']])
+            ws2 = ss.worksheet('Sheet2')
+            ws2.write_values('A1', [['data2']])
+
+    # Both worksheets should have been flushed (queues cleared)
+    assert len(ws1._value_updates) == 0
+    assert len(ws2._value_updates) == 0
+
+    # HTML files should exist for both
+    html_files = list(tmp_path.glob('*.html'))
+    assert len(html_files) == 2
+
+
+def test_spreadsheet_context_manager_no_flush_on_error():
+    """Spreadsheet context manager does not flush worksheets on exception."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    try:
+        with ss:
+            ws = ss.worksheet('Sheet1')
+            ws.write_values('A1', [['data']])
+            raise ValueError('Test error')
+    except ValueError:
+        pass
+
+    # Queue should still have the value since flush was skipped
+    assert len(ws._value_updates) == 1
+
+
+def test_spreadsheet_context_manager_flush_is_idempotent(tmp_path):
+    """Flushing via worksheet then spreadsheet context is idempotent."""
+    with patch('webbrowser.open'):  # Suppress browser opening
+        with Spreadsheet(
+            local_preview=True, spreadsheet_name='Test', preview_dir=str(tmp_path)
+        ) as ss:
+            with ss.worksheet('Sheet1') as ws:
+                ws.write_values('A1', [['data']])
+            # ws already flushed here
+
+    # Should not raise, and still have one HTML file
+    html_files = list(tmp_path.glob('*.html'))
+    assert len(html_files) == 1
+
+
+def test_spreadsheet_context_manager_opens_previews_in_local_mode(tmp_path):
+    """Spreadsheet context manager opens previews in browser in local_preview mode."""
+    with patch('webbrowser.open') as mock_open:
+        with Spreadsheet(
+            local_preview=True, spreadsheet_name='Test', preview_dir=str(tmp_path)
+        ) as ss:
+            ss.worksheet('Sheet1').write_values('A1', [['data1']])
+            ss.worksheet('Sheet2').write_values('A1', [['data2']])
+
+    # Should have opened browser for both worksheets
+    assert mock_open.call_count == 2
+
+
+def test_spreadsheet_context_manager_no_preview_in_normal_mode():
+    """Spreadsheet context manager does not open browser in normal mode."""
+    with patch('eftoolkit.gsheets.sheet.service_account_from_dict') as mock_sa:
+        mock_gc = MagicMock()
+        mock_spreadsheet = MagicMock()
+        mock_gc.open.return_value = mock_spreadsheet
+        mock_sa.return_value = mock_gc
+
+        with patch('webbrowser.open') as mock_open:
+            with Spreadsheet(
+                credentials={'type': 'service_account'},
+                spreadsheet_name='Test',
+            ):
+                pass
+
+        # Should not have opened browser
+        mock_open.assert_not_called()
+
+
+def test_spreadsheet_open_all_previews_raises_in_normal_mode():
+    """open_all_previews() raises RuntimeError when not in preview mode."""
+    with patch('eftoolkit.gsheets.sheet.service_account_from_dict') as mock_sa:
+        mock_gc = MagicMock()
+        mock_gc.open.return_value = MagicMock()
+        mock_sa.return_value = mock_gc
+
+        ss = Spreadsheet(
+            credentials={'type': 'service_account'},
+            spreadsheet_name='Test',
+        )
+
+        with pytest.raises(RuntimeError, match='local_preview mode'):
+            ss.open_all_previews()
+
+
+def test_spreadsheet_open_all_previews_opens_browser(tmp_path):
+    """open_all_previews() opens browser for each worksheet."""
+    ss = Spreadsheet(
+        local_preview=True, spreadsheet_name='Test', preview_dir=str(tmp_path)
+    )
+    ws1 = ss.worksheet('Sheet1')
+    ws1.write_values('A1', [['test1']])
+    ws1.flush()
+    ws2 = ss.worksheet('Sheet2')
+    ws2.write_values('A1', [['test2']])
+    ws2.flush()
+
+    with patch('webbrowser.open') as mock_open:
+        ss.open_all_previews()
+
+        assert mock_open.call_count == 2
+
+
+def test_spreadsheet_create_worksheet_with_replace_clears_cache():
+    """create_worksheet with replace=True clears cached worksheet."""
+    mock_gspread = MagicMock()
+    mock_ws_old = MagicMock()
+    mock_ws_new = MagicMock()
+    mock_ws_new.title = 'Sheet1'
+    mock_gspread.worksheet.return_value = mock_ws_old
+    mock_gspread.add_worksheet.return_value = mock_ws_new
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    # First, access the worksheet to cache it
+    ss.worksheet('Sheet1')
+    assert 'Sheet1' in ss._worksheets
+
+    # Now create with replace
+    ws2 = ss.create_worksheet('Sheet1', replace=True)
+
+    # Should be a different instance
+    assert ws2._ws == mock_ws_new
+    assert ss._worksheets['Sheet1'] is ws2
