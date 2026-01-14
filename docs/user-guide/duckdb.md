@@ -126,11 +126,29 @@ df = db.get_table('measurements')
 
 ## Context Manager
 
+Using `DuckDB` as a context manager opens a persistent connection that is reused for all operations within the block. This improves performance when running multiple queries:
+
 ```python
 with DuckDB() as db:
-    df = db.query("SELECT 1")
-# Connection closed automatically
+    db.execute("CREATE TABLE t (x INT)")
+    db.execute("INSERT INTO t VALUES (1), (2), (3)")
+    result = db.query("SELECT SUM(x) as total FROM t")
+# Connection closed automatically on exit
 ```
+
+Without the context manager, each operation creates and closes its own connection:
+
+```python
+db = DuckDB()
+db.query("SELECT 1")  # Opens connection, runs query, closes connection
+db.query("SELECT 2")  # Opens new connection, runs query, closes connection
+```
+
+The context manager is especially useful for:
+
+- Running multiple queries in sequence
+- Creating tables and inserting data in an in-memory database
+- Transactions that need to share state
 
 ## Accessing Native API
 

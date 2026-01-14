@@ -48,6 +48,7 @@ class DuckDB:
         self.s3_secret_access_key = s3_secret_access_key
         self.s3_endpoint = s3_endpoint
         self.s3_url_style = s3_url_style
+        self._active_conn: duckdb.DuckDBPyConnection | None = None
 
         # Create S3FileSystem from credentials if provided and no s3 instance given
         if self._s3 is None and s3_access_key_id and s3_secret_access_key:
@@ -94,13 +95,22 @@ class DuckDB:
 
     @contextmanager
     def _get_connection(self):
-        """Get a configured database connection."""
-        conn = duckdb.connect(database=self.database)
-        self._setup_s3(conn)
-        try:
-            yield conn
-        finally:
-            conn.close()
+        """Get a configured database connection.
+
+        If used within a context manager (with statement), reuses the active
+        connection. Otherwise, creates a new connection for each operation.
+        """
+        if self._active_conn is not None:
+            # Reuse active connection from context manager
+            yield self._active_conn
+        else:
+            # Create a new connection for this operation
+            conn = duckdb.connect(database=self.database)
+            self._setup_s3(conn)
+            try:
+                yield conn
+            finally:
+                conn.close()
 
     def _clean_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """Replace inf/nan values with None."""
@@ -230,13 +240,29 @@ class DuckDB:
         self._s3.write_df_to_parquet(df, s3_uri)
 
     def __enter__(self) -> 'DuckDB':
-        """Context manager entry."""
+        """Context manager entry - opens a persistent connection.
+
+        When used as a context manager, all operations within the block
+        reuse the same connection for better performance.
+
+        Example:
+            >>> with DuckDB() as db:
+            ...     db.execute("CREATE TABLE t (x INT)")
+            ...     db.execute("INSERT INTO t VALUES (1)")
+            ...     result = db.query("SELECT * FROM t")
+        """
+        self._active_conn = duckdb.connect(database=self.database)
+        self._setup_s3(self._active_conn)
         return self
 
     def __exit__(self, *_args) -> None:
-        """Context manager exit."""
-        pass
+        """Context manager exit - closes the persistent connection."""
+        if self._active_conn is not None:
+            self._active_conn.close()
+            self._active_conn = None
 
     def close(self) -> None:
-        """Close the database (no-op for connection-per-operation model)."""
-        pass
+        """Close the active connection if one exists."""
+        if self._active_conn is not None:
+            self._active_conn.close()
+            self._active_conn = None
