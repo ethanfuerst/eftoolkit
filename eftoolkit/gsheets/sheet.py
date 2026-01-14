@@ -704,6 +704,17 @@ class Spreadsheet:
 
     Represents the entire spreadsheet document.
     Use worksheet() to get individual tabs for read/write operations.
+
+    Can be used as a context manager to automatically flush all accessed
+    worksheets on exit. In local_preview mode, previews open in browser:
+
+        with Spreadsheet(credentials, 'My Sheet') as ss:
+            ws1 = ss.worksheet('Tab1')
+            ws1.write_dataframe(df1)
+            ws2 = ss.worksheet('Tab2')
+            ws2.write_dataframe(df2)
+        # Both ws1 and ws2 are flushed here
+        # In local_preview mode, browser tabs open automatically
     """
 
     def __init__(
@@ -732,7 +743,7 @@ class Spreadsheet:
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._gspread_spreadsheet = None
-        self._preview_worksheets: dict[str, Worksheet] = {}  # Cache for preview mode
+        self._worksheets: dict[str, Worksheet] = {}  # Track all accessed worksheets
 
         if not local_preview:
             if not credentials:
@@ -781,13 +792,34 @@ class Spreadsheet:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit (no-op, worksheets manage their own flush)."""
-        pass
+        """Flush all accessed worksheets on clean exit.
+
+        In local_preview mode, also opens all preview HTML files in browser.
+        """
+        if exc_type is None:
+            for ws in self._worksheets.values():
+                ws.flush()
+            if self._local_preview:
+                self.open_all_previews()
 
     @property
     def is_local_preview(self) -> bool:
         """True if running in local preview mode."""
         return self._local_preview
+
+    def open_all_previews(self) -> None:
+        """Open all worksheet previews in browser (local_preview mode only).
+
+        Opens each accessed worksheet's HTML preview file in the default browser.
+
+        Raises:
+            RuntimeError: If not in local_preview mode.
+        """
+        if not self._local_preview:
+            raise RuntimeError('open_all_previews only available in local_preview mode')
+
+        for ws in self._worksheets.values():
+            ws.open_preview()
 
     def _preview_path_for_worksheet(self, worksheet_name: str) -> Path:
         """Generate preview file path for a worksheet."""
@@ -807,19 +839,23 @@ class Spreadsheet:
         Raises:
             WorksheetNotFound: If worksheet doesn't exist (not in local_preview mode).
         """
-        if self._local_preview:
-            if name not in self._preview_worksheets:
-                self._preview_worksheets[name] = Worksheet(
-                    None,
-                    self,
-                    local_preview=True,
-                    preview_output=self._preview_path_for_worksheet(name),
-                    worksheet_name=name,
-                )
-            return self._preview_worksheets[name]
+        if name in self._worksheets:
+            return self._worksheets[name]
 
-        gspread_ws = self._gspread_spreadsheet.worksheet(name)
-        return Worksheet(gspread_ws, self)
+        if self._local_preview:
+            ws = Worksheet(
+                None,
+                self,
+                local_preview=True,
+                preview_output=self._preview_path_for_worksheet(name),
+                worksheet_name=name,
+            )
+        else:
+            gspread_ws = self._gspread_spreadsheet.worksheet(name)
+            ws = Worksheet(gspread_ws, self)
+
+        self._worksheets[name] = ws
+        return ws
 
     def get_worksheet_names(self) -> list[str]:
         """List all worksheet names.
@@ -847,23 +883,27 @@ class Spreadsheet:
             Worksheet instance for the new tab.
         """
         if self._local_preview:
-            if name not in self._preview_worksheets:
-                self._preview_worksheets[name] = Worksheet(
+            if name not in self._worksheets:
+                self._worksheets[name] = Worksheet(
                     None,
                     self,
                     local_preview=True,
                     preview_output=self._preview_path_for_worksheet(name),
                     worksheet_name=name,
                 )
-            return self._preview_worksheets[name]
+            return self._worksheets[name]
 
         if replace:
             self.delete_worksheet(name, ignore_missing=True)
+            # Remove from cache if it existed
+            self._worksheets.pop(name, None)
 
         gspread_ws = self._gspread_spreadsheet.add_worksheet(
             title=name, rows=rows, cols=cols
         )
-        return Worksheet(gspread_ws, self)
+        ws = Worksheet(gspread_ws, self)
+        self._worksheets[name] = ws
+        return ws
 
     def delete_worksheet(self, name: str, *, ignore_missing: bool = True) -> None:
         """Delete worksheet by name.
