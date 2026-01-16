@@ -1,6 +1,29 @@
 """Utility functions for Google Sheets operations."""
 
 import re
+from collections.abc import Callable
+
+# Registry for batch request handlers. Starts empty; populated at import time
+BATCH_HANDLERS: dict[str, str] = {}
+
+
+def batch_handler(req_type: str) -> Callable:
+    """Decorator to register a Worksheet method as a batch request handler.
+
+    Usage:
+        @batch_handler('column_width')
+        def _handle_column_width(self, req: dict) -> None:
+            ...
+
+    This eliminates the need to manually maintain a dispatch dict.
+    When adding a new batch request type, simply decorate the handler method.
+    """
+
+    def decorator(method: Callable) -> Callable:
+        BATCH_HANDLERS[req_type] = method.__name__
+        return method
+
+    return decorator
 
 
 def parse_cell_reference(cell_ref: str) -> tuple[int, int]:
