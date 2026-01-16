@@ -266,6 +266,16 @@ ss.delete_worksheet('Old Tab')
 ss.delete_worksheet('Old Tab', ignore_missing=True)  # No error if missing
 ```
 
+### Reorder Worksheets
+
+```python
+# Reorder tabs to specified order
+ss.reorder_worksheets(['Dashboard', 'Draft', 'Manual Adds'])
+
+# Tabs not in the list are moved to the end in their original order
+# Missing tab names are gracefully skipped
+```
+
 ## Retry Behavior
 
 API calls automatically retry on transient errors:
