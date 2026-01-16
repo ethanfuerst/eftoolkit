@@ -12,7 +12,7 @@ import pandas as pd
 from gspread import service_account_from_dict
 from gspread.exceptions import APIError, WorksheetNotFound
 
-from eftoolkit.gsheets.utils import parse_cell_reference
+from eftoolkit.gsheets.utils import BATCH_HANDLERS, batch_handler, parse_cell_reference
 
 T = TypeVar('T')
 
@@ -540,13 +540,471 @@ class Worksheet:
                 'values_batch_update',
             )
 
-        # Flush batch requests (format, borders, etc.)
+        # Flush batch requests using handler registry
         for req in self._batch_requests:
-            if req['type'] == 'format':
-                self._spreadsheet._execute_with_retry(
-                    lambda r=req: self._ws.format(r['range'], r['format']),
-                    'format',
-                )
+            req_type = req['type']
+            method_name = BATCH_HANDLERS.get(req_type)
+            if method_name is None:
+                raise ValueError(f"Unknown batch request type: '{req_type}'")
+            handler = getattr(self, method_name)
+            handler(req)
+
+    @batch_handler('format')
+    def _handle_format(self, req: dict) -> None:
+        """Handle format request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#repeatcellrequest
+        """
+        self._spreadsheet._execute_with_retry(
+            lambda: self._ws.format(req['range'], req['format']),
+            'format',
+        )
+
+    @batch_handler('border')
+    def _handle_border(self, req: dict) -> None:
+        """Handle border request via raw batch update.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatebordersrequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        borders = req['borders']
+        border_request = {
+            'updateBorders': {
+                'range': range_obj,
+                **borders,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [border_request]}
+            ),
+            'border',
+        )
+
+    @batch_handler('column_width')
+    def _handle_column_width(self, req: dict) -> None:
+        """Handle column width request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatedimensionpropertiesrequest
+        """
+        column = req['column']
+        width = req['width']
+        # Convert letter to 0-based index
+        if isinstance(column, str):
+            col_idx = 0
+            for char in column.upper():
+                col_idx = col_idx * 26 + (ord(char) - ord('A') + 1)
+            col_idx -= 1
+        else:
+            col_idx = column - 1  # Convert 1-based to 0-based
+
+        request = {
+            'updateDimensionProperties': {
+                'range': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'COLUMNS',
+                    'startIndex': col_idx,
+                    'endIndex': col_idx + 1,
+                },
+                'properties': {
+                    'pixelSize': width,
+                },
+                'fields': 'pixelSize',
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'column_width',
+        )
+
+    @batch_handler('auto_resize')
+    def _handle_auto_resize(self, req: dict) -> None:
+        """Handle auto resize columns request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#autoresizedimensionsrequest
+        """
+        start_col = req['start_col'] - 1  # Convert to 0-based
+        end_col = req['end_col']  # end is exclusive, so no -1
+        request = {
+            'autoResizeDimensions': {
+                'dimensions': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'COLUMNS',
+                    'startIndex': start_col,
+                    'endIndex': end_col,
+                }
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'auto_resize',
+        )
+
+    @batch_handler('notes')
+    def _handle_notes(self, req: dict) -> None:
+        """Handle notes request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatecellsrequest
+        """
+        for cell_ref, note_text in req['notes'].items():
+            self._spreadsheet._execute_with_retry(
+                lambda c=cell_ref, n=note_text: self._ws.update_note(c, n),
+                'notes',
+            )
+
+    @batch_handler('merge')
+    def _handle_merge(self, req: dict) -> None:
+        """Handle merge cells request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#mergecellsrequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        request = {
+            'mergeCells': {
+                'range': range_obj,
+                'mergeType': req['merge_type'],
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'merge',
+        )
+
+    @batch_handler('unmerge')
+    def _handle_unmerge(self, req: dict) -> None:
+        """Handle unmerge cells request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#unmergecellsrequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        request = {
+            'unmergeCells': {
+                'range': range_obj,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'unmerge',
+        )
+
+    @batch_handler('sort')
+    def _handle_sort(self, req: dict) -> None:
+        """Handle sort range request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#sortrangerequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        sort_specs = [
+            {
+                'dimensionIndex': spec['column'],
+                'sortOrder': 'ASCENDING'
+                if spec.get('ascending', True)
+                else 'DESCENDING',
+            }
+            for spec in req['sort_specs']
+        ]
+        request = {
+            'sortRange': {
+                'range': range_obj,
+                'sortSpecs': sort_specs,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'sort',
+        )
+
+    @batch_handler('data_validation')
+    def _handle_data_validation(self, req: dict) -> None:
+        """Handle data validation request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#setdatavalidationrequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        rule = req['rule']
+
+        condition_type = rule.get('type', 'ONE_OF_LIST')
+        condition_values = [{'userEnteredValue': v} for v in rule.get('values', [])]
+
+        request = {
+            'setDataValidation': {
+                'range': range_obj,
+                'rule': {
+                    'condition': {
+                        'type': condition_type,
+                        'values': condition_values,
+                    },
+                    'showCustomUi': rule.get('showDropdown', True),
+                    'strict': rule.get('strict', True),
+                },
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'data_validation',
+        )
+
+    @batch_handler('clear_data_validation')
+    def _handle_clear_data_validation(self, req: dict) -> None:
+        """Handle clear data validation request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#setdatavalidationrequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        request = {
+            'setDataValidation': {
+                'range': range_obj,
+                'rule': None,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'clear_data_validation',
+        )
+
+    @batch_handler('conditional_format')
+    def _handle_conditional_format(self, req: dict) -> None:
+        """Handle conditional format request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#addconditionalformatrulerequest
+        """
+        range_obj = self._parse_range_to_grid_range(req['range'])
+        rule = req['rule']
+
+        condition_type = rule.get('type', 'CUSTOM_FORMULA')
+        condition_values = [{'userEnteredValue': v} for v in rule.get('values', [])]
+
+        request = {
+            'addConditionalFormatRule': {
+                'rule': {
+                    'ranges': [range_obj],
+                    'booleanRule': {
+                        'condition': {
+                            'type': condition_type,
+                            'values': condition_values,
+                        },
+                        'format': rule.get('format', {}),
+                    },
+                },
+                'index': 0,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'conditional_format',
+        )
+
+    @batch_handler('insert_rows')
+    def _handle_insert_rows(self, req: dict) -> None:
+        """Handle insert rows request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#insertdimensionrequest
+        """
+        start_row = req['start_row'] - 1  # Convert to 0-based
+        num_rows = req['num_rows']
+        request = {
+            'insertDimension': {
+                'range': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'ROWS',
+                    'startIndex': start_row,
+                    'endIndex': start_row + num_rows,
+                },
+                'inheritFromBefore': start_row > 0,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'insert_rows',
+        )
+
+    @batch_handler('delete_rows')
+    def _handle_delete_rows(self, req: dict) -> None:
+        """Handle delete rows request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#deletedimensionrequest
+        """
+        start_row = req['start_row'] - 1  # Convert to 0-based
+        num_rows = req['num_rows']
+        request = {
+            'deleteDimension': {
+                'range': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'ROWS',
+                    'startIndex': start_row,
+                    'endIndex': start_row + num_rows,
+                }
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'delete_rows',
+        )
+
+    @batch_handler('insert_columns')
+    def _handle_insert_columns(self, req: dict) -> None:
+        """Handle insert columns request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#insertdimensionrequest
+        """
+        start_col = req['start_col'] - 1  # Convert to 0-based
+        num_cols = req['num_cols']
+        request = {
+            'insertDimension': {
+                'range': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'COLUMNS',
+                    'startIndex': start_col,
+                    'endIndex': start_col + num_cols,
+                },
+                'inheritFromBefore': start_col > 0,
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'insert_columns',
+        )
+
+    @batch_handler('delete_columns')
+    def _handle_delete_columns(self, req: dict) -> None:
+        """Handle delete columns request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#deletedimensionrequest
+        """
+        start_col = req['start_col'] - 1  # Convert to 0-based
+        num_cols = req['num_cols']
+        request = {
+            'deleteDimension': {
+                'range': {
+                    'sheetId': self._ws.id,
+                    'dimension': 'COLUMNS',
+                    'startIndex': start_col,
+                    'endIndex': start_col + num_cols,
+                }
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'delete_columns',
+        )
+
+    @batch_handler('freeze_rows')
+    def _handle_freeze_rows(self, req: dict) -> None:
+        """Handle freeze rows request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatesheetpropertiesrequest
+        """
+        num_rows = req['num_rows']
+        request = {
+            'updateSheetProperties': {
+                'properties': {
+                    'sheetId': self._ws.id,
+                    'gridProperties': {
+                        'frozenRowCount': num_rows,
+                    },
+                },
+                'fields': 'gridProperties.frozenRowCount',
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'freeze_rows',
+        )
+
+    @batch_handler('freeze_columns')
+    def _handle_freeze_columns(self, req: dict) -> None:
+        """Handle freeze columns request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatesheetpropertiesrequest
+        """
+        num_cols = req['num_cols']
+        request = {
+            'updateSheetProperties': {
+                'properties': {
+                    'sheetId': self._ws.id,
+                    'gridProperties': {
+                        'frozenColumnCount': num_cols,
+                    },
+                },
+                'fields': 'gridProperties.frozenColumnCount',
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'freeze_columns',
+        )
+
+    @batch_handler('raw')
+    def _handle_raw(self, req: dict) -> None:
+        """Handle raw batch update request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request
+        """
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [req['request']]}
+            ),
+            'raw',
+        )
+
+    def _parse_range_to_grid_range(self, range_name: str) -> dict:
+        """Parse A1 notation range to GridRange dict for batch_update requests.
+
+        Args:
+            range_name: A1 notation range (e.g., 'A1:C10' or 'Sheet1!A1:C10').
+
+        Returns:
+            GridRange dict with sheetId, startRowIndex, endRowIndex,
+            startColumnIndex, endColumnIndex.
+        """
+        # Strip sheet name if present
+        if '!' in range_name:
+            range_name = range_name.split('!', 1)[1]
+
+        # Parse start and end cells
+        if ':' in range_name:
+            start_cell, end_cell = range_name.split(':')
+        else:
+            start_cell = end_cell = range_name
+
+        start_row, start_col = parse_cell_reference(start_cell)
+        end_row, end_col = parse_cell_reference(end_cell)
+
+        return {
+            'sheetId': self._ws.id,
+            'startRowIndex': start_row,
+            'endRowIndex': end_row + 1,  # exclusive
+            'startColumnIndex': start_col,
+            'endColumnIndex': end_col + 1,  # exclusive
+        }
 
     def _flush_to_preview(self) -> None:
         """Render queued operations to local HTML preview as a unified grid."""
