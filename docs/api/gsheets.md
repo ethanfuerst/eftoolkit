@@ -1,6 +1,6 @@
 # eftoolkit.gsheets
 
-Google Sheets client with automatic batching.
+Google Sheets client with automatic batching and dashboard orchestration.
 
 ## Classes
 
@@ -52,3 +52,49 @@ Google Sheets client with automatic batching.
         - open_preview
         - title
         - is_local_preview
+
+### DashboardRunner
+
+::: eftoolkit.gsheets.runner.DashboardRunner
+    options:
+      show_root_heading: true
+      show_source: true
+      members:
+        - __init__
+        - run
+
+### WorksheetRegistry
+
+::: eftoolkit.gsheets.registry.WorksheetRegistry
+    options:
+      show_root_heading: true
+      show_source: true
+      members:
+        - register
+        - get_ordered_worksheets
+        - get_worksheet
+        - reorder
+        - clear
+
+## Types
+
+### CellLocation
+
+::: eftoolkit.gsheets.types.CellLocation
+    options:
+      show_root_heading: true
+      show_source: true
+
+### WorksheetAsset
+
+::: eftoolkit.gsheets.types.WorksheetAsset
+    options:
+      show_root_heading: true
+      show_source: true
+
+### WorksheetDefinition
+
+::: eftoolkit.gsheets.types.WorksheetDefinition
+    options:
+      show_root_heading: true
+      show_source: true
