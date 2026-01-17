@@ -1,5 +1,12 @@
 """Google Sheets utilities for eftoolkit."""
 
 from eftoolkit.gsheets.sheet import Spreadsheet, Worksheet
+from eftoolkit.gsheets.types import CellLocation, WorksheetAsset, WorksheetDefinition
 
-__all__ = ['Spreadsheet', 'Worksheet']
+__all__ = [
+    'CellLocation',
+    'Spreadsheet',
+    'Worksheet',
+    'WorksheetAsset',
+    'WorksheetDefinition',
+]
