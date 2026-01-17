@@ -1,6 +1,6 @@
 """eftoolkit - A streamlined Python toolkit for everyday programming tasks."""
 
-from eftoolkit.config import load_json_config, setup_logging
+from eftoolkit.config import load_json_config, remove_comments, setup_logging
 from eftoolkit.gsheets import Spreadsheet, Worksheet
 from eftoolkit.s3 import S3FileSystem
 from eftoolkit.sql import DuckDB
@@ -12,5 +12,6 @@ __all__ = [
     'Spreadsheet',
     'Worksheet',
     'load_json_config',
+    'remove_comments',
     'setup_logging',
 ]

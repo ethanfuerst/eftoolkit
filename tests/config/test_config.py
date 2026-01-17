@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from eftoolkit.config import load_json_config, setup_logging
+from eftoolkit.config import load_json_config, remove_comments, setup_logging
 from eftoolkit.config.utils import _strip_comments
 
 
@@ -182,3 +182,135 @@ def test_strip_comments_slash_at_end_of_line():
 
     # Single / at end stays
     assert result == '{"key": 1}/'
+
+
+def test_remove_comments_simple_dict():
+    """remove_comments removes _comment keys from a dict."""
+    config = {
+        '_comment': 'This is a comment',
+        'setting': 'value',
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'setting': 'value'}
+
+
+def test_remove_comments_nested_dict():
+    """remove_comments removes _comment keys from nested dicts."""
+    config = {
+        '_comment': 'Top-level comment',
+        'setting': 'value',
+        'nested': {
+            '_comment': 'Nested comment',
+            'key': 'value',
+        },
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'setting': 'value', 'nested': {'key': 'value'}}
+
+
+def test_remove_comments_numbered_comment_keys():
+    """remove_comments removes _comment_1, _comment_foo, etc."""
+    config = {
+        '_comment': 'First comment',
+        '_comment_1': 'Second comment',
+        '_comment_foo': 'Named comment',
+        'setting': 'value',
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'setting': 'value'}
+
+
+def test_remove_comments_list():
+    """remove_comments recursively processes lists."""
+    config = [
+        {'_comment': 'Comment in list', 'key': 'value1'},
+        {'_comment': 'Another comment', 'key': 'value2'},
+    ]
+
+    result = remove_comments(config)
+
+    assert result == [{'key': 'value1'}, {'key': 'value2'}]
+
+
+def test_remove_comments_nested_list():
+    """remove_comments handles nested lists and dicts."""
+    config = {
+        '_comment': 'Top comment',
+        'items': [
+            {'_comment': 'Item comment', 'name': 'item1'},
+            {'_comment': 'Item comment', 'name': 'item2'},
+        ],
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'items': [{'name': 'item1'}, {'name': 'item2'}]}
+
+
+def test_remove_comments_preserves_non_comment_underscore_keys():
+    """remove_comments preserves keys starting with _ but not _comment."""
+    config = {
+        '_comment': 'This should be removed',
+        '_internal': 'This should stay',
+        '_private_setting': 'This too',
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'_internal': 'This should stay', '_private_setting': 'This too'}
+
+
+def test_remove_comments_empty_dict():
+    """remove_comments handles empty dict."""
+    result = remove_comments({})
+
+    assert result == {}
+
+
+def test_remove_comments_empty_list():
+    """remove_comments handles empty list."""
+    result = remove_comments([])
+
+    assert result == []
+
+
+def test_remove_comments_non_dict_values():
+    """remove_comments preserves non-dict/list values."""
+    config = {
+        '_comment': 'Comment',
+        'string': 'value',
+        'number': 42,
+        'boolean': True,
+        'null': None,
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'string': 'value', 'number': 42, 'boolean': True, 'null': None}
+
+
+def test_remove_comments_deeply_nested():
+    """remove_comments handles deeply nested structures."""
+    config = {
+        '_comment': 'Level 0',
+        'level1': {
+            '_comment': 'Level 1',
+            'level2': {
+                '_comment': 'Level 2',
+                'level3': {
+                    '_comment': 'Level 3',
+                    'value': 'deep',
+                },
+            },
+        },
+    }
+
+    result = remove_comments(config)
+
+    assert result == {'level1': {'level2': {'level3': {'value': 'deep'}}}}
