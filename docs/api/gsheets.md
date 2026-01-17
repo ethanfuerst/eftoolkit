@@ -16,6 +16,7 @@ Google Sheets client with automatic batching.
         - get_worksheet_names
         - create_worksheet
         - delete_worksheet
+        - reorder_worksheets
         - is_local_preview
 
 ### Worksheet

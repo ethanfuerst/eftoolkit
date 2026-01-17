@@ -368,3 +368,100 @@ def test_spreadsheet_create_worksheet_with_replace_clears_cache():
     # Should be a different instance
     assert ws2._ws == mock_ws_new
     assert ss._worksheets['Sheet1'] is ws2
+
+
+def test_reorder_worksheets_local_preview():
+    """reorder_worksheets() is a no-op in local preview mode."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+
+    # Should not raise
+    ss.reorder_worksheets(['Sheet1', 'Sheet2'])
+
+
+def test_reorder_worksheets_reorders_to_specified_order():
+    """reorder_worksheets() reorders worksheets to match specified order."""
+    mock_gspread = MagicMock()
+    mock_ws1 = MagicMock()
+    mock_ws1.title = 'Alpha'
+    mock_ws2 = MagicMock()
+    mock_ws2.title = 'Beta'
+    mock_ws3 = MagicMock()
+    mock_ws3.title = 'Gamma'
+    mock_gspread.worksheets.return_value = [mock_ws1, mock_ws2, mock_ws3]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    ss.reorder_worksheets(['Gamma', 'Alpha', 'Beta'])
+
+    mock_gspread.reorder_worksheets.assert_called_once()
+    call_args = mock_gspread.reorder_worksheets.call_args[0][0]
+
+    assert [ws.title for ws in call_args] == ['Gamma', 'Alpha', 'Beta']
+
+
+def test_reorder_worksheets_unspecified_tabs_at_end():
+    """reorder_worksheets() moves unspecified tabs to end in original order."""
+    mock_gspread = MagicMock()
+    mock_ws1 = MagicMock()
+    mock_ws1.title = 'Alpha'
+    mock_ws2 = MagicMock()
+    mock_ws2.title = 'Beta'
+    mock_ws3 = MagicMock()
+    mock_ws3.title = 'Gamma'
+    mock_ws4 = MagicMock()
+    mock_ws4.title = 'Delta'
+    mock_gspread.worksheets.return_value = [mock_ws1, mock_ws2, mock_ws3, mock_ws4]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    # Only specify Gamma and Alpha, Beta and Delta should follow in original order
+    ss.reorder_worksheets(['Gamma', 'Alpha'])
+
+    call_args = mock_gspread.reorder_worksheets.call_args[0][0]
+
+    assert [ws.title for ws in call_args] == ['Gamma', 'Alpha', 'Beta', 'Delta']
+
+
+def test_reorder_worksheets_skips_missing_tabs():
+    """reorder_worksheets() skips tabs that don't exist."""
+    mock_gspread = MagicMock()
+    mock_ws1 = MagicMock()
+    mock_ws1.title = 'Alpha'
+    mock_ws2 = MagicMock()
+    mock_ws2.title = 'Beta'
+    mock_gspread.worksheets.return_value = [mock_ws1, mock_ws2]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    # 'Missing' doesn't exist, should be skipped
+    ss.reorder_worksheets(['Missing', 'Beta', 'Alpha'])
+
+    call_args = mock_gspread.reorder_worksheets.call_args[0][0]
+
+    assert [ws.title for ws in call_args] == ['Beta', 'Alpha']
+
+
+def test_reorder_worksheets_empty_order_preserves_original():
+    """reorder_worksheets() with empty list preserves original order."""
+    mock_gspread = MagicMock()
+    mock_ws1 = MagicMock()
+    mock_ws1.title = 'Alpha'
+    mock_ws2 = MagicMock()
+    mock_ws2.title = 'Beta'
+    mock_gspread.worksheets.return_value = [mock_ws1, mock_ws2]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    ss.reorder_worksheets([])
+
+    call_args = mock_gspread.reorder_worksheets.call_args[0][0]
+
+    assert [ws.title for ws in call_args] == ['Alpha', 'Beta']

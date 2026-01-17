@@ -1379,3 +1379,40 @@ class Spreadsheet:
         except WorksheetNotFound:
             if not ignore_missing:
                 raise
+
+    def reorder_worksheets(self, order: list[str]) -> None:
+        """Reorder worksheets (tabs) to the specified order.
+
+        Worksheets are reordered to match the given list. Worksheets not in the
+        list are moved to the end in their original relative order. Worksheet
+        names in the list that don't exist in the spreadsheet are skipped.
+
+        Args:
+            order: List of worksheet titles in the desired order.
+
+        Example:
+            ss.reorder_worksheets(['Dashboard', 'Draft', 'Manual Adds'])
+            # Dashboard first, then Draft, then Manual Adds, then any other tabs
+        """
+        if self._local_preview:
+            return
+
+        all_worksheets = self._gspread_spreadsheet.worksheets()
+        worksheets_by_title = {ws.title: ws for ws in all_worksheets}
+
+        # Build ordered list: specified worksheets first (if they exist)
+        ordered = []
+        for title in order:
+            if title in worksheets_by_title:
+                ordered.append(worksheets_by_title[title])
+
+        # Append remaining worksheets in their original order
+        ordered_titles = {ws.title for ws in ordered}
+        for ws in all_worksheets:
+            if ws.title not in ordered_titles:
+                ordered.append(ws)
+
+        self._execute_with_retry(
+            lambda: self._gspread_spreadsheet.reorder_worksheets(ordered),
+            'reorder_worksheets',
+        )
