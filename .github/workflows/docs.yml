@@ -23,11 +23,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git-cliff
 
       - uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
         run: uv sync --extra dev
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4.7.0
+        with:
+          config: cliff.toml
+          args: --output docs/development/changelog.md
 
       - name: Build documentation
         run: uv run mkdocs build --strict

@@ -8,15 +8,14 @@ Example usage:
     from eftoolkit.gsheets.types import WorksheetDefinition
 
     # Register multiple worksheets at once (simplest approach)
-    WorksheetRegistry.register_all([
+    WorksheetRegistry.register([
         SummaryWorksheet(),
         RevenueWorksheet(),
         ExpensesWorksheet(),
     ])
 
-    # Or register individually with optional positioning
+    # Or register one at a time
     WorksheetRegistry.register(SummaryWorksheet())
-    WorksheetRegistry.register(RevenueWorksheet(), after='Summary')
 
     # Retrieve in registration order
     worksheets = WorksheetRegistry.get_ordered_worksheets()
@@ -95,7 +94,7 @@ class WorksheetRegistry:
 
         Returns:
             List of worksheet definitions in the order they were registered,
-            respecting any `after` positioning specified during registration.
+            respecting any reordering done via `reorder()`.
 
         Example:
             >>> worksheets = WorksheetRegistry.get_ordered_worksheets()
@@ -138,7 +137,7 @@ class WorksheetRegistry:
                 (missing names, extra names, or duplicates).
 
         Example:
-            >>> WorksheetRegistry.register_all([Summary(), Revenue(), Expenses()])
+            >>> WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
             >>> WorksheetRegistry.reorder(['Expenses', 'Summary', 'Revenue'])
             >>> [ws.name for ws in WorksheetRegistry.get_ordered_worksheets()]
             ['Expenses', 'Summary', 'Revenue']

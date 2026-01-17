@@ -77,7 +77,7 @@ test.db
 credentials.json
 
 # Claude Code
-.claude/
+.claude/*
 !.claude/CLAUDE.md
 
 # Project-specific
