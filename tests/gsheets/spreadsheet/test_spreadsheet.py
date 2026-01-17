@@ -30,7 +30,9 @@ def test_spreadsheet_context_manager():
 
 def test_spreadsheet_init_with_credentials():
     """Spreadsheet initializes with mocked gspread connection."""
-    with patch('eftoolkit.gsheets.sheet.service_account_from_dict') as mock_sa:
+    with patch(
+        'eftoolkit.gsheets.core.spreadsheet.service_account_from_dict'
+    ) as mock_sa:
         mock_gc = MagicMock()
         mock_spreadsheet = MagicMock()
         mock_gc.open.return_value = mock_spreadsheet
@@ -294,7 +296,9 @@ def test_spreadsheet_context_manager_opens_previews_in_local_mode(tmp_path):
 
 def test_spreadsheet_context_manager_no_preview_in_normal_mode():
     """Spreadsheet context manager does not open browser in normal mode."""
-    with patch('eftoolkit.gsheets.sheet.service_account_from_dict') as mock_sa:
+    with patch(
+        'eftoolkit.gsheets.core.spreadsheet.service_account_from_dict'
+    ) as mock_sa:
         mock_gc = MagicMock()
         mock_spreadsheet = MagicMock()
         mock_gc.open.return_value = mock_spreadsheet
@@ -313,7 +317,9 @@ def test_spreadsheet_context_manager_no_preview_in_normal_mode():
 
 def test_spreadsheet_open_all_previews_raises_in_normal_mode():
     """open_all_previews() raises RuntimeError when not in preview mode."""
-    with patch('eftoolkit.gsheets.sheet.service_account_from_dict') as mock_sa:
+    with patch(
+        'eftoolkit.gsheets.core.spreadsheet.service_account_from_dict'
+    ) as mock_sa:
         mock_gc = MagicMock()
         mock_gc.open.return_value = MagicMock()
         mock_sa.return_value = mock_gc

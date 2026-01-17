@@ -10,7 +10,7 @@ Orchestrates the complete workflow for updating Google Sheets dashboards:
 6. Log summary
 
 Example usage:
-    from eftoolkit.gsheets import DashboardRunner, WorksheetRegistry
+    from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
 
     # Define and register worksheets
     WorksheetRegistry.register([
@@ -30,10 +30,10 @@ Example usage:
 import logging
 from typing import Any
 
-from eftoolkit.config.utils import load_json_config
-from eftoolkit.gsheets.registry import WorksheetRegistry
-from eftoolkit.gsheets.sheet import Spreadsheet
-from eftoolkit.gsheets.types import WorksheetAsset, WorksheetDefinition
+from eftoolkit.gsheets.core import Spreadsheet
+from eftoolkit.gsheets.runner.registry import WorksheetRegistry
+from eftoolkit.gsheets.runner.types import WorksheetAsset, WorksheetDefinition
+from eftoolkit.gsheets.utils import load_json_config
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,8 @@ class DashboardRunner:
         """Phase 3: Write all DataFrames to worksheets.
 
         Opens the spreadsheet and writes each asset to its worksheet.
-        Creates worksheets if they don't exist.
+        Creates worksheets if they don't exist. Data is written without
+        formatting; formatting is applied in Phase 4.
         """
         logger.info('Phase 3: Writing data')
 
@@ -188,17 +189,9 @@ class DashboardRunner:
                 ws = ss.create_worksheet(worksheet_def.name, replace=True)
 
                 for asset in self.results[worksheet_def.name]:
-                    # Build format dict from file and/or inline config
-                    format_dict = None
-                    if asset.format_config_path:
-                        format_dict = load_json_config(asset.format_config_path)
-                    if asset.format_dict:
-                        format_dict = {**(format_dict or {}), **asset.format_dict}
-
                     ws.write_dataframe(
                         df=asset.df,
                         location=asset.location.cell,
-                        format_dict=format_dict,
                     )
                     logger.info(
                         '  Wrote %d rows to %s!%s',
@@ -208,19 +201,36 @@ class DashboardRunner:
                     )
 
     def _phase_4_apply_formatting(self) -> None:
-        """Phase 4: Apply worksheet-level formatting overrides.
+        """Phase 4: Apply worksheet-level formatting.
 
-        Calls get_format_overrides() on each worksheet definition.
-        Currently logs the overrides; actual application is worksheet-specific.
+        Calls get_formatting() on each worksheet definition and applies
+        the returned WorksheetFormatting configuration. This is called
+        once per worksheet after all data has been written.
         """
         logger.info('Phase 4: Applying formatting')
 
         for worksheet_def in self.worksheets:
-            overrides = worksheet_def.get_format_overrides(self.context)
-            if overrides:
-                logger.info(
-                    '  Format overrides for %s: %s', worksheet_def.name, overrides
-                )
+            formatting = worksheet_def.get_formatting(self.context)
+            if formatting is None:
+                logger.info('  No formatting for %s', worksheet_def.name)
+                continue
+
+            # Build format dict from file and/or inline config
+            format_dict = None
+            if formatting.format_config_path:
+                format_dict = load_json_config(formatting.format_config_path)
+            if formatting.format_dict:
+                format_dict = {**(format_dict or {}), **formatting.format_dict}
+
+            logger.info(
+                '  Formatting for %s: freeze_rows=%s, freeze_columns=%s, '
+                'auto_resize=%s, format_dict=%s',
+                worksheet_def.name,
+                formatting.freeze_rows,
+                formatting.freeze_columns,
+                formatting.auto_resize_columns,
+                format_dict is not None,
+            )
 
     def _phase_5_run_hooks(self) -> None:
         """Phase 5: Run post-write hooks.
