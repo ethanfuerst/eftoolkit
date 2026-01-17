@@ -71,7 +71,7 @@ class WorksheetAsset:
     """An asset to be written to a worksheet.
 
     Contains a DataFrame to write, its target location within the worksheet,
-    optional formatting configuration, and post-write hooks.
+    optional formatting configuration, rich formatting options, and post-write hooks.
 
     A WorksheetDefinition.generate() returns a list of WorksheetAssets, allowing
     multiple DataFrames to be written to different locations on the same worksheet.
@@ -81,13 +81,22 @@ class WorksheetAsset:
         location: Where to write the DataFrame within the worksheet.
         format_config_path: Path to a JSON format configuration file.
         format_dict: Inline format configuration dictionary.
-        post_write_hooks: Callables to run after writing (e.g., conditional formatting).
+        merge_ranges: List of cell ranges to merge (e.g., ['B2:F2', 'I2:X2']).
+        conditional_formats: List of conditional format rules. Each rule is a dict
+            with 'range', 'type', 'values', and 'format' keys.
+        notes: Dict mapping cell addresses to note text (e.g., {'A1': 'Note here'}).
+        column_widths: Dict mapping column letters or indices to pixel widths
+            (e.g., {'A': 100, 'B': 200} or {1: 100, 2: 200}).
+        post_write_hooks: Callables to run after writing (e.g., complex formatting).
 
     Example:
         >>> asset = WorksheetAsset(
         ...     df=my_dataframe,
         ...     location=CellLocation(cell='B4'),
         ...     format_config_path=Path('formats/summary.json'),
+        ...     merge_ranges=['B2:F2'],
+        ...     notes={'B4': 'Data starts here'},
+        ...     column_widths={'A': 150, 'B': 200},
         ... )
     """
 
@@ -95,6 +104,10 @@ class WorksheetAsset:
     location: CellLocation
     format_config_path: Path | None = None
     format_dict: dict[str, Any] | None = None
+    merge_ranges: list[str] = field(default_factory=list)
+    conditional_formats: list[dict[str, Any]] = field(default_factory=list)
+    notes: dict[str, str] = field(default_factory=dict)
+    column_widths: dict[str | int, int] = field(default_factory=dict)
     post_write_hooks: list[Callable] = field(default_factory=list)
 
 

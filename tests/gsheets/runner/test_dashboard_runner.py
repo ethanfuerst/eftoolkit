@@ -574,3 +574,284 @@ def test_multiple_assets_per_worksheet():
         ]
         assert 'A1' in locations
         assert 'A5' in locations
+
+
+def test_phase_3_applies_merge_ranges():
+    """Phase 3 applies merge_ranges from WorksheetAsset."""
+
+    class WorksheetWithMerges:
+        @property
+        def name(self) -> str:
+            return 'WithMerges'
+
+        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+            return [
+                WorksheetAsset(
+                    df=pd.DataFrame({'a': [1]}),
+                    location=CellLocation(cell='A1'),
+                    merge_ranges=['B2:F2', 'I2:X2'],
+                )
+            ]
+
+        def get_format_overrides(self, context: dict) -> dict:
+            return {}
+
+    ws = WorksheetWithMerges()
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        assert mock_worksheet.merge_cells.call_count == 2
+        merge_calls = [call[0][0] for call in mock_worksheet.merge_cells.call_args_list]
+        assert 'B2:F2' in merge_calls
+        assert 'I2:X2' in merge_calls
+
+
+def test_phase_3_applies_conditional_formats():
+    """Phase 3 applies conditional_formats from WorksheetAsset."""
+
+    class WorksheetWithConditionalFormats:
+        @property
+        def name(self) -> str:
+            return 'WithCF'
+
+        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+            return [
+                WorksheetAsset(
+                    df=pd.DataFrame({'a': [1]}),
+                    location=CellLocation(cell='A1'),
+                    conditional_formats=[
+                        {
+                            'range': 'X5:X100',
+                            'type': 'TEXT_EQ',
+                            'values': ['Yes'],
+                            'format': {'bold': True},
+                        }
+                    ],
+                )
+            ]
+
+        def get_format_overrides(self, context: dict) -> dict:
+            return {}
+
+    ws = WorksheetWithConditionalFormats()
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        mock_worksheet.add_conditional_format.assert_called_once()
+        call_args = mock_worksheet.add_conditional_format.call_args
+        assert call_args[0][0] == 'X5:X100'
+        assert call_args[0][1]['type'] == 'TEXT_EQ'
+        assert call_args[0][1]['values'] == ['Yes']
+
+
+def test_phase_3_applies_notes():
+    """Phase 3 applies notes from WorksheetAsset."""
+
+    class WorksheetWithNotes:
+        @property
+        def name(self) -> str:
+            return 'WithNotes'
+
+        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+            return [
+                WorksheetAsset(
+                    df=pd.DataFrame({'a': [1]}),
+                    location=CellLocation(cell='A1'),
+                    notes={'U4': 'Note text here', 'A1': 'Header'},
+                )
+            ]
+
+        def get_format_overrides(self, context: dict) -> dict:
+            return {}
+
+    ws = WorksheetWithNotes()
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        mock_worksheet.set_notes.assert_called_once_with(
+            {'U4': 'Note text here', 'A1': 'Header'}
+        )
+
+
+def test_phase_3_applies_column_widths():
+    """Phase 3 applies column_widths from WorksheetAsset."""
+
+    class WorksheetWithColumnWidths:
+        @property
+        def name(self) -> str:
+            return 'WithWidths'
+
+        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+            return [
+                WorksheetAsset(
+                    df=pd.DataFrame({'a': [1]}),
+                    location=CellLocation(cell='A1'),
+                    column_widths={'A': 25, 'J': 284},
+                )
+            ]
+
+        def get_format_overrides(self, context: dict) -> dict:
+            return {}
+
+    ws = WorksheetWithColumnWidths()
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        assert mock_worksheet.set_column_width.call_count == 2
+        width_calls = {
+            call[0][0]: call[0][1]
+            for call in mock_worksheet.set_column_width.call_args_list
+        }
+        assert width_calls['A'] == 25
+        assert width_calls['J'] == 284
+
+
+def test_phase_3_applies_all_rich_formatting():
+    """Phase 3 applies all rich formatting options from WorksheetAsset."""
+
+    class WorksheetWithAllFormatting:
+        @property
+        def name(self) -> str:
+            return 'AllFormatting'
+
+        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+            return [
+                WorksheetAsset(
+                    df=pd.DataFrame({'a': [1]}),
+                    location=CellLocation(cell='B4'),
+                    merge_ranges=['B2:F2'],
+                    conditional_formats=[
+                        {'range': 'B5:B10', 'type': 'NUMBER_GT', 'values': ['100']}
+                    ],
+                    notes={'B4': 'Start'},
+                    column_widths={'A': 100},
+                )
+            ]
+
+        def get_format_overrides(self, context: dict) -> dict:
+            return {}
+
+    ws = WorksheetWithAllFormatting()
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        # All formatting methods should be called
+        mock_worksheet.merge_cells.assert_called_once_with('B2:F2')
+        mock_worksheet.add_conditional_format.assert_called_once()
+        mock_worksheet.set_notes.assert_called_once_with({'B4': 'Start'})
+        mock_worksheet.set_column_width.assert_called_once_with('A', 100)
+
+
+def test_phase_3_skips_empty_rich_formatting():
+    """Phase 3 does not call formatting methods when fields are empty."""
+    ws = MockWorksheetDefinition('NoFormatting', pd.DataFrame({'a': [1]}))
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data()
+
+        # Formatting methods should not be called
+        mock_worksheet.merge_cells.assert_not_called()
+        mock_worksheet.add_conditional_format.assert_not_called()
+        mock_worksheet.set_notes.assert_not_called()
+        mock_worksheet.set_column_width.assert_not_called()

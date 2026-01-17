@@ -428,9 +428,56 @@ class FormattedWorksheet:
         return {}
 ```
 
+### Rich Formatting
+
+`WorksheetAsset` supports declarative rich formatting options that are applied after data is written:
+
+```python
+class RichlyFormattedWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Dashboard'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        df = pd.DataFrame({'Metric': ['Revenue', 'Expenses'], 'Value': [100000, 75000]})
+        return [
+            WorksheetAsset(
+                df=df,
+                location=CellLocation(cell='B4'),
+                # Cell merges
+                merge_ranges=['B2:F2', 'I2:X2'],
+                # Conditional formatting rules
+                conditional_formats=[
+                    {
+                        'range': 'C5:C100',
+                        'type': 'NUMBER_GREATER',
+                        'values': ['50000'],
+                        'format': {'backgroundColor': {'red': 0.8, 'green': 1, 'blue': 0.8}},
+                    }
+                ],
+                # Cell notes/comments
+                notes={'B4': 'Data starts here', 'C4': 'Currency values'},
+                # Column widths (in pixels)
+                column_widths={'A': 25, 'B': 150, 'C': 100},
+            )
+        ]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+```
+
+Available rich formatting options:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `merge_ranges` | `list[str]` | Cell ranges to merge (e.g., `['B2:F2']`) |
+| `conditional_formats` | `list[dict]` | Conditional format rules with `range`, `type`, `values`, `format` |
+| `notes` | `dict[str, str]` | Cell notes mapping cell address to note text |
+| `column_widths` | `dict[str\|int, int]` | Column widths in pixels by letter or index |
+
 ### Post-Write Hooks
 
-Execute callbacks after data is written (e.g., conditional formatting):
+For complex formatting logic that can't be expressed declaratively, use post-write hooks:
 
 ```python
 def add_conditional_formatting():

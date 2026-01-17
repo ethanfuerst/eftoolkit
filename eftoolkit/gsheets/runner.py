@@ -175,7 +175,8 @@ class DashboardRunner:
         """Phase 3: Write all DataFrames to worksheets.
 
         Opens the spreadsheet and writes each asset to its worksheet.
-        Creates worksheets if they don't exist.
+        Creates worksheets if they don't exist. Applies rich formatting
+        (merges, conditional formats, notes, column widths) after writing data.
         """
         logger.info('Phase 3: Writing data')
 
@@ -206,6 +207,52 @@ class DashboardRunner:
                         worksheet_def.name,
                         asset.location.cell,
                     )
+
+                    # Apply rich formatting from asset
+                    self._apply_asset_formatting(ws, asset, worksheet_def.name)
+
+    def _apply_asset_formatting(
+        self,
+        ws: Any,
+        asset: WorksheetAsset,
+        worksheet_name: str,
+    ) -> None:
+        """Apply rich formatting options from a WorksheetAsset.
+
+        Args:
+            ws: The Worksheet object to apply formatting to.
+            asset: The WorksheetAsset containing formatting options.
+            worksheet_name: Name of the worksheet (for logging).
+        """
+        # Apply cell merges
+        for merge_range in asset.merge_ranges:
+            ws.merge_cells(merge_range)
+            logger.info('  Merged %s!%s', worksheet_name, merge_range)
+
+        # Apply conditional formatting
+        for cf_rule in asset.conditional_formats:
+            range_name = cf_rule.get('range', '')
+            rule = {
+                'type': cf_rule.get('type', 'CUSTOM_FORMULA'),
+                'values': cf_rule.get('values', []),
+                'format': cf_rule.get('format', {}),
+            }
+            ws.add_conditional_format(range_name, rule)
+            logger.info(
+                '  Added conditional format to %s!%s', worksheet_name, range_name
+            )
+
+        # Apply notes
+        if asset.notes:
+            ws.set_notes(asset.notes)
+            logger.info('  Added %d notes to %s', len(asset.notes), worksheet_name)
+
+        # Apply column widths
+        for column, width in asset.column_widths.items():
+            ws.set_column_width(column, width)
+            logger.info(
+                '  Set column %s width to %d in %s', column, width, worksheet_name
+            )
 
     def _phase_4_apply_formatting(self) -> None:
         """Phase 4: Apply worksheet-level formatting overrides.
