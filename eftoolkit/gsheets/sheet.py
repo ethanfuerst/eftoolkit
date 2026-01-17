@@ -84,6 +84,42 @@ class Worksheet:
             return pd.DataFrame()
         return pd.DataFrame(data=all_values[1:], columns=all_values[0])
 
+    def read_cell(self, cell: str) -> Any:
+        """Read value of a single cell.
+
+        Args:
+            cell: A1 notation cell reference (e.g., 'V5', 'AA10').
+
+        Returns:
+            The cell's value (string, number, or empty string if blank).
+
+        Example:
+            value = ws.read_cell('V5')
+        """
+        if self._local_preview:
+            raise NotImplementedError('read_cell not available in local preview mode')
+
+        return self._ws.acell(cell).value
+
+    def read_range(self, range_name: str) -> list[list[Any]]:
+        """Read values from a cell range.
+
+        Args:
+            range_name: A1 notation range (e.g., 'V5:V10', 'A1:C3').
+
+        Returns:
+            2D list of values (list of rows, each row is a list of cell values).
+            Empty cells are represented as empty strings.
+
+        Example:
+            values = ws.read_range('V5:V10')
+            # Returns: [['value1'], ['value2'], ...]
+        """
+        if self._local_preview:
+            raise NotImplementedError('read_range not available in local preview mode')
+
+        return self._ws.get(range_name)
+
     def write_dataframe(
         self,
         df: pd.DataFrame,
