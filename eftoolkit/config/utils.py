@@ -101,3 +101,37 @@ def setup_logging(
         format=format,
         force=True,
     )
+
+
+def remove_comments(obj: dict | list) -> dict | list:
+    """Remove comment keys from a nested dictionary or list.
+
+    Recursively filters out keys starting with '_comment' from dictionaries.
+    Useful for stripping documentation keys from JSON configuration files.
+
+    Args:
+        obj: A dictionary or list, potentially nested.
+
+    Returns:
+        A copy with all '_comment*' keys removed. Returns the input unchanged
+        if it's neither a dict nor a list.
+
+    Example:
+        >>> config = {
+        ...     '_comment': 'This is a comment',
+        ...     'setting': 'value',
+        ...     'nested': {'_comment': 'Nested comment', 'key': 'value'}
+        ... }
+        >>> remove_comments(config)
+        {'setting': 'value', 'nested': {'key': 'value'}}
+    """
+    if isinstance(obj, dict):
+        return {
+            k: remove_comments(v)
+            for k, v in obj.items()
+            if not k.startswith('_comment')
+        }
+    elif isinstance(obj, list):
+        return [remove_comments(item) for item in obj]
+    else:
+        return obj
