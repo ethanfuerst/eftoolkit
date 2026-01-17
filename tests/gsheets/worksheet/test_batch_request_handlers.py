@@ -502,3 +502,57 @@ def test_range_with_sheet_name_prefix_is_parsed_correctly():
     assert range_obj['startColumnIndex'] == 0  # A column
     assert range_obj['endRowIndex'] == 3  # C3 row (exclusive)
     assert range_obj['endColumnIndex'] == 3  # C column (exclusive)
+
+
+# --- Read Operations ---
+
+
+def test_read_cell_calls_gspread_acell():
+    """read_cell calls gspread worksheet's acell method."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    # Setup mock return value
+    mock_cell = MagicMock()
+    mock_cell.value = 'test_value'
+    mock_ws.acell.return_value = mock_cell
+
+    result = ws.read_cell('V5')
+
+    mock_ws.acell.assert_called_once_with('V5')
+    assert result == 'test_value'
+
+
+def test_read_cell_returns_empty_string_for_blank():
+    """read_cell returns empty string for blank cell."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_cell = MagicMock()
+    mock_cell.value = ''
+    mock_ws.acell.return_value = mock_cell
+
+    result = ws.read_cell('A1')
+
+    assert result == ''
+
+
+def test_read_range_calls_gspread_get():
+    """read_range calls gspread worksheet's get method."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_ws.get.return_value = [['val1'], ['val2'], ['val3']]
+
+    result = ws.read_range('V5:V7')
+
+    mock_ws.get.assert_called_once_with('V5:V7')
+    assert result == [['val1'], ['val2'], ['val3']]
+
+
+def test_read_range_returns_2d_list_for_multiple_columns():
+    """read_range returns 2D list for multi-column ranges."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_ws.get.return_value = [['a', 'b'], ['c', 'd']]
+
+    result = ws.read_range('A1:B2')
+
+    assert result == [['a', 'b'], ['c', 'd']]

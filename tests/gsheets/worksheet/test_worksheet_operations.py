@@ -342,3 +342,28 @@ def test_worksheet_add_raw_request_queues():
     assert len(ws._batch_requests) == 1
     assert ws._batch_requests[0]['type'] == 'raw'
     assert ws._batch_requests[0]['request'] == raw_request
+
+
+# --- Read Operations ---
+
+
+def test_worksheet_read_cell_raises_in_local_preview():
+    """read_cell raises NotImplementedError in local preview mode."""
+    import pytest
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    with pytest.raises(NotImplementedError):
+        ws.read_cell('V5')
+
+
+def test_worksheet_read_range_raises_in_local_preview():
+    """read_range raises NotImplementedError in local preview mode."""
+    import pytest
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    with pytest.raises(NotImplementedError):
+        ws.read_range('V5:V10')
