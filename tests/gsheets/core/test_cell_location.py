@@ -2,7 +2,7 @@
 
 import pytest
 
-from eftoolkit.gsheets.types import CellLocation
+from eftoolkit.gsheets.runner import CellLocation
 
 
 def test_create_with_cell():

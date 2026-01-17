@@ -4,8 +4,7 @@ This module provides a centralized registry for managing worksheet definitions,
 maintaining registration order and supporting ordered retrieval.
 
 Example usage:
-    from eftoolkit.gsheets import WorksheetRegistry
-    from eftoolkit.gsheets.types import WorksheetDefinition
+    from eftoolkit.gsheets.runner import WorksheetRegistry, WorksheetDefinition
 
     # Register multiple worksheets at once (simplest approach)
     WorksheetRegistry.register([
@@ -32,7 +31,7 @@ Example usage:
 
 import threading
 
-from eftoolkit.gsheets.types import WorksheetDefinition
+from eftoolkit.gsheets.runner.types import WorksheetDefinition
 
 
 class WorksheetRegistry:

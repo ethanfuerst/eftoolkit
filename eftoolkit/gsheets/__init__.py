@@ -1,16 +1,19 @@
-"""Google Sheets utilities for eftoolkit."""
+"""Google Sheets utilities for eftoolkit.
 
-from eftoolkit.gsheets.registry import WorksheetRegistry
-from eftoolkit.gsheets.runner import DashboardRunner
-from eftoolkit.gsheets.sheet import Spreadsheet, Worksheet
-from eftoolkit.gsheets.types import CellLocation, WorksheetAsset, WorksheetDefinition
+Basic usage:
+    from eftoolkit.gsheets import Spreadsheet
 
-__all__ = [
-    'CellLocation',
-    'DashboardRunner',
-    'Spreadsheet',
-    'Worksheet',
-    'WorksheetAsset',
-    'WorksheetDefinition',
-    'WorksheetRegistry',
-]
+For dashboard workflows:
+    from eftoolkit.gsheets.runner import (
+        DashboardRunner,
+        WorksheetRegistry,
+        CellLocation,
+        WorksheetAsset,
+        WorksheetDefinition,
+        WorksheetFormatting,
+    )
+"""
+
+from eftoolkit.gsheets.core import Spreadsheet, Worksheet
+
+__all__ = ['Spreadsheet', 'Worksheet']

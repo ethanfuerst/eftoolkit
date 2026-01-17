@@ -6,8 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import pytest
 
-from eftoolkit.gsheets.registry import WorksheetRegistry
-from eftoolkit.gsheets.types import CellLocation, WorksheetAsset
+from eftoolkit.gsheets.runner import CellLocation, WorksheetAsset, WorksheetRegistry
 
 
 class MockWorksheet:

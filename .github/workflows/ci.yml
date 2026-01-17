@@ -66,7 +66,7 @@ jobs:
       matrix:
         include:
           - extra: ""
-            import: "from eftoolkit import DuckDB, S3FileSystem, Spreadsheet, Worksheet"
+            import: "from eftoolkit.sql import DuckDB; from eftoolkit.s3 import S3FileSystem; from eftoolkit.gsheets import Spreadsheet, Worksheet"
           - extra: "[sql-only]"
             import: "from eftoolkit.sql import DuckDB"
           - extra: "[s3-only]"

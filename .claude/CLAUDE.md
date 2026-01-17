@@ -7,9 +7,12 @@ A personal Python toolkit providing reusable utilities for common tasks. Include
 - `eftoolkit/` - Main package
   - `sql/duckdb.py` - `DuckDB` class: query, execute, S3 read/write
   - `s3/filesystem.py` - `S3FileSystem` class: parquet read/write, file operations
-  - `gsheets/sheet.py` - `Spreadsheet` and `Worksheet` classes: worksheet operations with batching
-  - `gsheets/runner.py` - `DashboardRunner`: 6-phase workflow orchestrator
-  - `gsheets/registry.py` - `WorksheetRegistry`: worksheet definition registry
+  - `gsheets/core/` - `Spreadsheet` and `Worksheet` classes: worksheet operations with batching
+  - `gsheets/runner/` - `DashboardRunner`: 6-phase workflow orchestrator
+  - `gsheets/runner/registry.py` - `WorksheetRegistry`: worksheet definition registry
+  - `gsheets/runner/types/` - Type definitions for dashboard runner
+  - `gsheets/utils.py` - JSON config loading, cell parsing utilities
+  - `utils.py` - General utilities (logging setup)
 - `tests/` - pytest test suite
   - `conftest.py` - shared fixtures (sample DataFrames, mock S3)
 - `pyproject.toml` - project metadata, dependencies, tool configs
@@ -42,7 +45,10 @@ uv run pytest --cov=eftoolkit --cov-report=term-missing
 ```python
 from eftoolkit.sql import DuckDB
 from eftoolkit.s3 import S3FileSystem
-from eftoolkit.gsheets import Spreadsheet, Worksheet, DashboardRunner, WorksheetRegistry
+from eftoolkit.gsheets import Spreadsheet, Worksheet
+from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
+from eftoolkit.gsheets.utils import load_json_config, remove_comments
+from eftoolkit.utils import setup_logging
 ```
 
 ## Code style
@@ -67,7 +73,7 @@ from eftoolkit.gsheets import Spreadsheet, Worksheet, DashboardRunner, Worksheet
 
 ## Project-specific notes
 
-- **Flat package layout**: Code lives directly in `eftoolkit/sql/`, `eftoolkit/s3/`, `eftoolkit/gsheets/`.
+- **Package layout**: `eftoolkit/sql/`, `eftoolkit/s3/`, `eftoolkit/gsheets/` (with `core/`, `runner/` subdirs).
 - **Pre-commit with ruff**: Uses ruff for linting and formatting.
 - **S3FileSystem**: Uses `boto3`. Requires credentials (explicit args or env vars).
 - **Spreadsheet**: Has local preview mode (`local_preview=True`) for development without API calls.

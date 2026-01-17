@@ -6,9 +6,13 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from eftoolkit.gsheets.registry import WorksheetRegistry
-from eftoolkit.gsheets.runner import DashboardRunner
-from eftoolkit.gsheets.types import CellLocation, WorksheetAsset
+from eftoolkit.gsheets.runner import (
+    CellLocation,
+    DashboardRunner,
+    WorksheetAsset,
+    WorksheetFormatting,
+    WorksheetRegistry,
+)
 
 
 class MockWorksheetDefinition:
@@ -19,13 +23,13 @@ class MockWorksheetDefinition:
         name: str,
         df: pd.DataFrame | None = None,
         location: str = 'A1',
-        format_overrides: dict | None = None,
+        formatting: WorksheetFormatting | None = None,
         post_write_hooks: list | None = None,
     ):
         self._name = name
         self._df = df if df is not None else pd.DataFrame({'a': [1, 2, 3]})
         self._location = location
-        self._format_overrides = format_overrides or {}
+        self._formatting = formatting
         self._post_write_hooks = post_write_hooks or []
 
     @property
@@ -41,8 +45,8 @@ class MockWorksheetDefinition:
             )
         ]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return self._format_overrides
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return self._formatting
 
 
 @pytest.fixture(autouse=True)
@@ -149,7 +153,7 @@ def test_phase_3_write_data_local_preview(tmp_path):
 
     runner._phase_2_generate_data()
 
-    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
         mock_spreadsheet = MagicMock()
         mock_worksheet = MagicMock()
         mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
@@ -170,9 +174,13 @@ def test_phase_3_write_data_local_preview(tmp_path):
         mock_worksheet.write_dataframe.assert_called_once()
 
 
-def test_phase_4_apply_formatting():
-    """Phase 4 applies format overrides."""
-    ws = MockWorksheetDefinition('Formatted', format_overrides={'color': 'blue'})
+def test_phase_4_apply_formatting_with_formatting():
+    """Phase 4 applies formatting when get_formatting returns WorksheetFormatting."""
+    formatting = WorksheetFormatting(
+        freeze_rows=1,
+        format_dict={'color': 'blue'},
+    )
+    ws = MockWorksheetDefinition('Formatted', formatting=formatting)
 
     runner = DashboardRunner(
         config={'sheet_name': 'Test'},
@@ -181,8 +189,77 @@ def test_phase_4_apply_formatting():
     )
 
     runner._phase_2_generate_data()
-    # Phase 4 just logs overrides for now; verify no exceptions
+    # Phase 4 logs formatting info; verify no exceptions
     runner._phase_4_apply_formatting()
+
+
+def test_phase_4_apply_formatting_with_none():
+    """Phase 4 handles None from get_formatting."""
+    ws = MockWorksheetDefinition('NoFormatting', formatting=None)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+    runner._phase_4_apply_formatting()
+
+
+def test_phase_4_apply_formatting_with_config_path(tmp_path, caplog):
+    """Phase 4 loads formatting from format_config_path."""
+    format_file = tmp_path / 'format.json'
+    format_file.write_text('{"header_color": "#4a86e8"}')
+
+    formatting = WorksheetFormatting(format_config_path=format_file)
+    ws = MockWorksheetDefinition('WithConfigPath', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with (
+        patch(
+            'eftoolkit.gsheets.runner.dashboard_runner.load_json_config'
+        ) as mock_load,
+        caplog.at_level(logging.INFO),
+    ):
+        mock_load.return_value = {'header_color': '#4a86e8'}
+        runner._phase_4_apply_formatting()
+
+        mock_load.assert_called_once_with(format_file)
+
+
+def test_phase_4_merges_config_path_and_format_dict(tmp_path):
+    """Phase 4 merges format_config_path and format_dict, with dict taking precedence."""
+    format_file = tmp_path / 'base.json'
+
+    formatting = WorksheetFormatting(
+        format_config_path=format_file,
+        format_dict={'color': 'blue', 'bold': True},  # Override color, add bold
+    )
+    ws = MockWorksheetDefinition('Merged', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch(
+        'eftoolkit.gsheets.runner.dashboard_runner.load_json_config'
+    ) as mock_load:
+        mock_load.return_value = {'color': 'red', 'size': 12}
+        runner._phase_4_apply_formatting()
+
+        mock_load.assert_called_once_with(format_file)
 
 
 def test_phase_5_runs_hooks():
@@ -292,7 +369,7 @@ def test_run_with_local_preview(tmp_path):
         local_preview=True,
     )
 
-    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
         mock_spreadsheet = MagicMock()
         mock_worksheet = MagicMock()
         mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
@@ -318,7 +395,7 @@ def test_phase_1_validates_structure():
         local_preview=False,
     )
 
-    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
         mock_spreadsheet = MagicMock()
         mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
         mock_spreadsheet.__exit__ = MagicMock(return_value=None)
@@ -350,8 +427,8 @@ def test_context_shared_between_worksheets():
                 )
             ]
 
-        def get_format_overrides(self, context: dict) -> dict:
-            return {}
+        def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+            return None
 
     ws1 = MockWorksheetDefinition('First', pd.DataFrame({'x': [1, 2, 3]}))
     ws2 = ContextAwareWorksheet()
@@ -368,12 +445,10 @@ def test_context_shared_between_worksheets():
     assert received_context['First']['total_rows'] == 3
 
 
-def test_format_config_from_file(tmp_path):
-    """Asset with format_config_path loads format from file."""
-    format_file = tmp_path / 'format.json'
-    format_file.write_text('{"header_color": "#4a86e8"}')
+def test_phase_3_writes_data_without_formatting():
+    """Phase 3 writes data without any formatting."""
 
-    class WorksheetWithFormatPath:
+    class WorksheetWithFormatting:
         @property
         def name(self) -> str:
             return 'Formatted'
@@ -383,14 +458,16 @@ def test_format_config_from_file(tmp_path):
                 WorksheetAsset(
                     df=pd.DataFrame({'a': [1]}),
                     location=CellLocation(cell='A1'),
-                    format_config_path=format_file,
                 )
             ]
 
-        def get_format_overrides(self, context: dict) -> dict:
-            return {}
+        def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+            return WorksheetFormatting(
+                freeze_rows=1,
+                format_dict={'header_color': '#4a86e8'},
+            )
 
-    ws = WorksheetWithFormatPath()
+    ws = WorksheetWithFormatting()
 
     runner = DashboardRunner(
         config={'sheet_name': 'Test'},
@@ -401,11 +478,7 @@ def test_format_config_from_file(tmp_path):
 
     runner._phase_2_generate_data()
 
-    with (
-        patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss,
-        patch('eftoolkit.gsheets.runner.load_json_config') as mock_load,
-    ):
-        mock_load.return_value = {'header_color': '#4a86e8'}
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
         mock_spreadsheet = MagicMock()
         mock_worksheet = MagicMock()
         mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
@@ -415,111 +488,11 @@ def test_format_config_from_file(tmp_path):
 
         runner._phase_3_write_data()
 
-        mock_load.assert_called_once_with(format_file)
+        # write_dataframe should be called without format_dict
         call_kwargs = mock_worksheet.write_dataframe.call_args[1]
-        assert call_kwargs['format_dict'] == {'header_color': '#4a86e8'}
-
-
-def test_format_dict_inline():
-    """Asset with inline format_dict passes it to write_dataframe."""
-
-    class WorksheetWithInlineFormat:
-        @property
-        def name(self) -> str:
-            return 'Inline'
-
-        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
-            return [
-                WorksheetAsset(
-                    df=pd.DataFrame({'a': [1]}),
-                    location=CellLocation(cell='B2'),
-                    format_dict={'bold': True},
-                )
-            ]
-
-        def get_format_overrides(self, context: dict) -> dict:
-            return {}
-
-    ws = WorksheetWithInlineFormat()
-
-    runner = DashboardRunner(
-        config={'sheet_name': 'Test'},
-        credentials={},
-        worksheets=[ws],
-        local_preview=True,
-    )
-
-    runner._phase_2_generate_data()
-
-    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
-        mock_spreadsheet = MagicMock()
-        mock_worksheet = MagicMock()
-        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
-        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
-        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
-        mock_ss.return_value = mock_spreadsheet
-
-        runner._phase_3_write_data()
-
-        call_kwargs = mock_worksheet.write_dataframe.call_args[1]
-        assert call_kwargs['format_dict'] == {'bold': True}
-        assert call_kwargs['location'] == 'B2'
-
-
-def test_format_dict_merged_from_file_and_inline(tmp_path):
-    """Inline format_dict merges with and overrides format_config_path."""
-    format_file = tmp_path / 'base_format.json'
-    format_file.write_text('{"color": "red", "size": 12}')
-
-    class WorksheetWithBothFormats:
-        @property
-        def name(self) -> str:
-            return 'Merged'
-
-        def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
-            return [
-                WorksheetAsset(
-                    df=pd.DataFrame({'a': [1]}),
-                    location=CellLocation(cell='A1'),
-                    format_config_path=format_file,
-                    format_dict={
-                        'color': 'blue',
-                        'bold': True,
-                    },  # Override color, add bold
-                )
-            ]
-
-        def get_format_overrides(self, context: dict) -> dict:
-            return {}
-
-    ws = WorksheetWithBothFormats()
-
-    runner = DashboardRunner(
-        config={'sheet_name': 'Test'},
-        credentials={},
-        worksheets=[ws],
-        local_preview=True,
-    )
-
-    runner._phase_2_generate_data()
-
-    with (
-        patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss,
-        patch('eftoolkit.gsheets.runner.load_json_config') as mock_load,
-    ):
-        mock_load.return_value = {'color': 'red', 'size': 12}
-        mock_spreadsheet = MagicMock()
-        mock_worksheet = MagicMock()
-        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
-        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
-        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
-        mock_ss.return_value = mock_spreadsheet
-
-        runner._phase_3_write_data()
-
-        call_kwargs = mock_worksheet.write_dataframe.call_args[1]
-        # Inline overrides file config
-        assert call_kwargs['format_dict'] == {'color': 'blue', 'size': 12, 'bold': True}
+        assert (
+            'format_dict' not in call_kwargs or call_kwargs.get('format_dict') is None
+        )
 
 
 def test_multiple_assets_per_worksheet():
@@ -542,8 +515,8 @@ def test_multiple_assets_per_worksheet():
                 ),
             ]
 
-        def get_format_overrides(self, context: dict) -> dict:
-            return {}
+        def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+            return None
 
     ws = MultiAssetWorksheet()
 
@@ -556,7 +529,7 @@ def test_multiple_assets_per_worksheet():
 
     runner._phase_2_generate_data()
 
-    with patch('eftoolkit.gsheets.runner.Spreadsheet') as mock_ss:
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
         mock_spreadsheet = MagicMock()
         mock_worksheet = MagicMock()
         mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)

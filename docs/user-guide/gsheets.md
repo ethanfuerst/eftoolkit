@@ -308,8 +308,12 @@ For complex dashboards with multiple worksheets, `DashboardRunner` provides a st
 ### Basic Usage
 
 ```python
-from eftoolkit.gsheets import DashboardRunner
-from eftoolkit.gsheets.types import CellLocation, WorksheetAsset, WorksheetDefinition
+from eftoolkit.gsheets.runner import (
+    CellLocation,
+    DashboardRunner,
+    WorksheetAsset,
+    WorksheetFormatting,
+)
 import pandas as pd
 
 
@@ -325,8 +329,8 @@ class RevenueWorksheet:
         })
         return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return None  # No special formatting
 
 
 runner = DashboardRunner(
@@ -356,8 +360,8 @@ class SummaryWorksheet:
             WorksheetAsset(df=breakdown, location=CellLocation(cell='A10')),
         ]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return None
 ```
 
 ### Using WorksheetRegistry
@@ -365,7 +369,7 @@ class SummaryWorksheet:
 For larger dashboards, use `WorksheetRegistry` to manage worksheet definitions:
 
 ```python
-from eftoolkit.gsheets import DashboardRunner, WorksheetRegistry
+from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
 
 # Register worksheets (order is preserved)
 WorksheetRegistry.register([
@@ -401,9 +405,9 @@ WorksheetRegistry.reorder(['Expenses', 'Summary', 'Revenue'])
 WorksheetRegistry.clear()
 ```
 
-### Format Configuration
+### Worksheet-Level Formatting
 
-Apply formatting via JSON config files or inline dictionaries:
+Formatting is applied at the worksheet level via `get_formatting()`, which returns a `WorksheetFormatting` object. This provides clear separation between data (in `WorksheetAsset`) and formatting:
 
 ```python
 from pathlib import Path
@@ -415,22 +419,40 @@ class FormattedWorksheet:
 
     def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
         df = pd.DataFrame({'Name': ['Alice'], 'Score': [95]})
-        return [
-            WorksheetAsset(
-                df=df,
-                location=CellLocation(cell='A1'),
-                format_config_path=Path('formats/summary.json'),  # Load from file
-                format_dict={'header_color': '#4a86e8'},  # Inline overrides
-            )
-        ]
+        return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return WorksheetFormatting(
+            freeze_rows=1,                              # Freeze header row
+            auto_resize_columns=(0, 5),                 # Auto-resize columns A-E
+            format_config_path=Path('formats/summary.json'),  # Load from file
+            format_dict={'header_color': '#4a86e8'},    # Inline overrides
+        )
 ```
+
+#### WorksheetFormatting Options
+
+`WorksheetFormatting` supports these options:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `freeze_rows` | `int \| None` | Number of rows to freeze from the top |
+| `freeze_columns` | `int \| None` | Number of columns to freeze from the left |
+| `auto_resize_columns` | `tuple[int, int] \| None` | (start, end) column indices to auto-resize |
+| `merge_ranges` | `list[str]` | A1-notation ranges to merge (e.g., `['A1:C1']`) |
+| `notes` | `dict[str, str]` | Cell address → note text mapping |
+| `column_widths` | `dict[str \| int, int]` | Column → width in pixels |
+| `borders` | `dict[str, dict]` | Range → border style configuration |
+| `conditional_formats` | `list[dict]` | Conditional formatting rules |
+| `data_validations` | `list[dict]` | Data validation rules |
+| `format_config_path` | `Path \| None` | Path to JSON format config file |
+| `format_dict` | `dict \| None` | Inline format configuration |
+
+When both `format_config_path` and `format_dict` are provided, they are merged with `format_dict` taking precedence.
 
 ### Post-Write Hooks
 
-Execute callbacks after data is written (e.g., conditional formatting):
+Execute callbacks after data is written (e.g., custom post-processing):
 
 ```python
 def add_conditional_formatting():
@@ -451,8 +473,8 @@ class HookedWorksheet:
             )
         ]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return None
 ```
 
 ### Local Preview Mode
@@ -485,8 +507,8 @@ class FirstWorksheet:
         df = pd.DataFrame({'Total': [total]})
         return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return None
 
 
 class SecondWorksheet:
@@ -499,8 +521,8 @@ class SecondWorksheet:
         df = pd.DataFrame({'Previous': [previous_total], 'New': [60000]})
         return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
 
-    def get_format_overrides(self, context: dict) -> dict:
-        return {}
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None:
+        return None
 ```
 
 ## See Also
