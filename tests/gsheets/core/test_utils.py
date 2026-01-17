@@ -50,7 +50,7 @@ class TestParseCellReference:
 
     def test_invalid_reference_returns_default(self):
         """Invalid cell reference returns (0, 0)."""
-        row, col = parse_cell_reference('invalid')
+        row, col = parse_cell_reference('123')  # Numbers only, no column letters
 
         assert row == 0
         assert col == 0
@@ -68,3 +68,24 @@ class TestParseCellReference:
 
         assert row == 2
         assert col == 1
+
+    def test_column_only_reference(self):
+        """Column-only reference like 'X' returns None for row."""
+        row, col = parse_cell_reference('X')
+
+        assert row is None
+        assert col == 23  # X = 23 (0-indexed)
+
+    def test_column_only_multi_letter(self):
+        """Multi-letter column-only reference like 'AA' returns None for row."""
+        row, col = parse_cell_reference('AA')
+
+        assert row is None
+        assert col == 26  # AA = 26 (0-indexed)
+
+    def test_column_only_lowercase(self):
+        """Lowercase column-only reference is handled correctly."""
+        row, col = parse_cell_reference('c')
+
+        assert row is None
+        assert col == 2  # C = 2 (0-indexed)

@@ -979,11 +979,13 @@ class Worksheet:
         """Parse A1 notation range to GridRange dict for batch_update requests.
 
         Args:
-            range_name: A1 notation range (e.g., 'A1:C10' or 'Sheet1!A1:C10').
+            range_name: A1 notation range (e.g., 'A1:C10', 'Sheet1!A1:C10', 'X5:X').
+                Supports open-ended ranges like 'X5:X' (column X from row 5 to end).
 
         Returns:
             GridRange dict with sheetId, startRowIndex, endRowIndex,
-            startColumnIndex, endColumnIndex.
+            startColumnIndex, endColumnIndex. endRowIndex is omitted for
+            open-ended ranges (meaning "to end of sheet").
         """
         # Strip sheet name if present
         if '!' in range_name:
@@ -998,13 +1000,18 @@ class Worksheet:
         start_row, start_col = parse_cell_reference(start_cell)
         end_row, end_col = parse_cell_reference(end_cell)
 
-        return {
+        result = {
             'sheetId': self._ws.id,
-            'startRowIndex': start_row,
-            'endRowIndex': end_row + 1,  # exclusive
+            'startRowIndex': start_row if start_row is not None else 0,
             'startColumnIndex': start_col,
             'endColumnIndex': end_col + 1,  # exclusive
         }
+
+        # Only include endRowIndex if end_row is specified (not open-ended)
+        if end_row is not None:
+            result['endRowIndex'] = end_row + 1  # exclusive
+
+        return result
 
     def _flush_to_preview(self) -> None:
         """Render queued operations to local HTML preview as a unified grid."""

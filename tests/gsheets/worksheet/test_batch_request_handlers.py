@@ -302,6 +302,35 @@ def test_add_conditional_format_calls_batch_update():
     assert 'addConditionalFormatRule' in request
 
 
+def test_add_conditional_format_with_open_ended_range():
+    """add_conditional_format with open-ended range like 'X5:X' omits endRowIndex."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    ws.add_conditional_format(
+        'X5:X',
+        {
+            'type': 'CUSTOM_FORMULA',
+            'values': ['=X5>0'],
+            'format': {'backgroundColor': {'red': 0, 'green': 1, 'blue': 0}},
+        },
+    )
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'addConditionalFormatRule' in request
+    ranges = request['addConditionalFormatRule']['rule']['ranges']
+
+    assert len(ranges) == 1
+    grid_range = ranges[0]
+    assert grid_range['startRowIndex'] == 4  # Row 5, 0-indexed
+    assert grid_range['startColumnIndex'] == 23  # Column X, 0-indexed
+    assert grid_range['endColumnIndex'] == 24  # Exclusive
+    assert 'endRowIndex' not in grid_range  # Open-ended, no end row
+
+
 def test_insert_rows_calls_batch_update():
     """insert_rows queues request that calls batch_update."""
     ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
