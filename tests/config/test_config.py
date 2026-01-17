@@ -93,6 +93,27 @@ def test_setup_logging_custom_format():
     assert logger.level == logging.INFO
 
 
+def test_setup_logging_custom_date_format():
+    """setup_logging accepts custom date_format string."""
+    custom_date_format = '%Y-%m-%d'
+
+    setup_logging(date_format=custom_date_format)
+
+    logger = logging.getLogger()
+
+    assert logger.level == logging.INFO
+
+
+def test_setup_logging_date_format_none_by_default():
+    """setup_logging uses None date_format by default."""
+    setup_logging()
+
+    # Verify no error occurred - date_format=None is valid
+    logger = logging.getLogger()
+
+    assert logger.level == logging.INFO
+
+
 def test_load_json_config_preserves_url_in_string(tmp_path):
     """load_json_config does not strip // inside strings."""
     config_file = tmp_path / 'config.json'
