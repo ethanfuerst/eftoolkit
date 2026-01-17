@@ -314,3 +314,64 @@ def test_remove_comments_deeply_nested():
     result = remove_comments(config)
 
     assert result == {'level1': {'level2': {'level3': {'value': 'deep'}}}}
+
+
+def test_load_json_config_strip_comment_keys_false_by_default(tmp_path):
+    """load_json_config preserves _comment keys by default."""
+    config_file = tmp_path / 'config.json'
+    config_file.write_text('{"_comment": "doc", "key": "value"}')
+
+    result = load_json_config(config_file)
+
+    assert result == {'_comment': 'doc', 'key': 'value'}
+
+
+def test_load_json_config_strip_comment_keys_true(tmp_path):
+    """load_json_config with strip_comment_keys=True removes _comment keys."""
+    config_file = tmp_path / 'config.json'
+    config_file.write_text('{"_comment": "doc", "key": "value"}')
+
+    result = load_json_config(config_file, strip_comment_keys=True)
+
+    assert result == {'key': 'value'}
+
+
+def test_load_json_config_strip_comment_keys_nested(tmp_path):
+    """load_json_config with strip_comment_keys=True removes nested _comment keys."""
+    config_file = tmp_path / 'config.json'
+    config_file.write_text("""{
+        "_comment": "Top-level comment",
+        "setting": "value",
+        "nested": {
+            "_comment": "Nested comment",
+            "key": "nested_value"
+        }
+    }""")
+
+    result = load_json_config(config_file, strip_comment_keys=True)
+
+    assert result == {'setting': 'value', 'nested': {'key': 'nested_value'}}
+
+
+def test_load_json_config_strip_comment_keys_with_jsonc_comments(tmp_path):
+    """load_json_config strips both JSONC comments and _comment keys."""
+    config_file = tmp_path / 'config.jsonc'
+    config_file.write_text("""{
+        // This JSONC comment is stripped from the file
+        "_comment": "This _comment key is stripped from the dict",
+        "key": "value"
+    }""")
+
+    result = load_json_config(config_file, strip_comment_keys=True)
+
+    assert result == {'key': 'value'}
+
+
+def test_load_json_config_strip_comment_keys_explicit_false(tmp_path):
+    """load_json_config with strip_comment_keys=False preserves _comment keys."""
+    config_file = tmp_path / 'config.json'
+    config_file.write_text('{"_comment": "preserved", "key": "value"}')
+
+    result = load_json_config(config_file, strip_comment_keys=False)
+
+    assert result == {'_comment': 'preserved', 'key': 'value'}

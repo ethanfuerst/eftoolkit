@@ -59,7 +59,7 @@ def _strip_comments(content: str) -> str:
     return '\n'.join(result_lines)
 
 
-def load_json_config(path: str | Path) -> dict:
+def load_json_config(path: str | Path, *, strip_comment_keys: bool = False) -> dict:
     """Load a JSON config file, stripping JSONC-style comments.
 
     Supports:
@@ -69,6 +69,8 @@ def load_json_config(path: str | Path) -> dict:
 
     Args:
         path: Path to the JSON/JSONC file
+        strip_comment_keys: If True, also remove keys starting with '_comment'
+            from the loaded config using remove_comments(). Default: False.
 
     Returns:
         Parsed JSON as a dictionary
@@ -76,11 +78,18 @@ def load_json_config(path: str | Path) -> dict:
     Raises:
         FileNotFoundError: If the file does not exist
         json.JSONDecodeError: If the content is not valid JSON after stripping comments
+
+    Example:
+        >>> # Load config with _comment keys stripped
+        >>> config = load_json_config('config.json', strip_comment_keys=True)
     """
     path = Path(path)
     content = path.read_text()
     stripped = _strip_comments(content)
-    return json.loads(stripped)
+    result = json.loads(stripped)
+    if strip_comment_keys:
+        result = remove_comments(result)
+    return result
 
 
 def setup_logging(
