@@ -294,6 +294,215 @@ ss = Spreadsheet(
 )
 ```
 
+## Dashboard Runner
+
+For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 6-phase workflow:
+
+1. **Validate structure** - Check spreadsheet access and permissions
+2. **Generate data** - Create all DataFrames (no API calls)
+3. **Write data** - Write DataFrames to worksheets
+4. **Apply formatting** - Apply worksheet-level formatting
+5. **Run hooks** - Execute post-write hooks
+6. **Log summary** - Report what was written
+
+### Basic Usage
+
+```python
+from eftoolkit.gsheets import DashboardRunner
+from eftoolkit.gsheets.types import CellLocation, WorksheetAsset, WorksheetDefinition
+import pandas as pd
+
+
+class RevenueWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Revenue'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        df = pd.DataFrame({
+            'Month': ['Jan', 'Feb', 'Mar'],
+            'Revenue': [10000, 12000, 11500],
+        })
+        return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+
+
+runner = DashboardRunner(
+    config={'sheet_name': 'Q1 Report'},
+    credentials=credentials,
+    worksheets=[RevenueWorksheet()],
+)
+runner.run()
+```
+
+### Multiple DataFrames per Worksheet
+
+A single worksheet can contain multiple DataFrames at different locations:
+
+```python
+class SummaryWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Summary'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        totals = pd.DataFrame({'Metric': ['Revenue', 'Expenses'], 'Value': [100000, 75000]})
+        breakdown = pd.DataFrame({'Category': ['Sales', 'Support'], 'Amount': [60000, 40000]})
+
+        return [
+            WorksheetAsset(df=totals, location=CellLocation(cell='A1')),
+            WorksheetAsset(df=breakdown, location=CellLocation(cell='A10')),
+        ]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+```
+
+### Using WorksheetRegistry
+
+For larger dashboards, use `WorksheetRegistry` to manage worksheet definitions:
+
+```python
+from eftoolkit.gsheets import DashboardRunner, WorksheetRegistry
+
+# Register worksheets (order is preserved)
+WorksheetRegistry.register([
+    SummaryWorksheet(),
+    RevenueWorksheet(),
+    ExpensesWorksheet(),
+])
+
+# Runner uses registered worksheets by default
+runner = DashboardRunner(
+    config={'sheet_name': 'Q1 Report'},
+    credentials=credentials,
+)
+runner.run()
+```
+
+Registry methods:
+
+```python
+# Register one at a time
+WorksheetRegistry.register(SummaryWorksheet())
+
+# Retrieve in registration order
+worksheets = WorksheetRegistry.get_ordered_worksheets()
+
+# Get a specific worksheet
+revenue = WorksheetRegistry.get_worksheet('Revenue')
+
+# Reorder worksheets
+WorksheetRegistry.reorder(['Expenses', 'Summary', 'Revenue'])
+
+# Clear registry (useful in tests)
+WorksheetRegistry.clear()
+```
+
+### Format Configuration
+
+Apply formatting via JSON config files or inline dictionaries:
+
+```python
+from pathlib import Path
+
+class FormattedWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Formatted'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        df = pd.DataFrame({'Name': ['Alice'], 'Score': [95]})
+        return [
+            WorksheetAsset(
+                df=df,
+                location=CellLocation(cell='A1'),
+                format_config_path=Path('formats/summary.json'),  # Load from file
+                format_dict={'header_color': '#4a86e8'},  # Inline overrides
+            )
+        ]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+```
+
+### Post-Write Hooks
+
+Execute callbacks after data is written (e.g., conditional formatting):
+
+```python
+def add_conditional_formatting():
+    print('Adding conditional formatting...')
+
+class HookedWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Hooked'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        df = pd.DataFrame({'Value': [1, 2, 3]})
+        return [
+            WorksheetAsset(
+                df=df,
+                location=CellLocation(cell='A1'),
+                post_write_hooks=[add_conditional_formatting],
+            )
+        ]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+```
+
+### Local Preview Mode
+
+Test your dashboard without API credentials:
+
+```python
+runner = DashboardRunner(
+    config={'sheet_name': 'Test Report'},
+    credentials=None,
+    worksheets=[RevenueWorksheet()],
+    local_preview=True,
+)
+runner.run()  # Writes to local HTML files instead of Google Sheets
+```
+
+### Shared Context
+
+Worksheets can share data via the `context` dictionary:
+
+```python
+class FirstWorksheet:
+    @property
+    def name(self) -> str:
+        return 'First'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        total = 50000
+        context['running_total'] = total  # Share with later worksheets
+        df = pd.DataFrame({'Total': [total]})
+        return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+
+
+class SecondWorksheet:
+    @property
+    def name(self) -> str:
+        return 'Second'
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
+        previous_total = context.get('running_total', 0)
+        df = pd.DataFrame({'Previous': [previous_total], 'New': [60000]})
+        return [WorksheetAsset(df=df, location=CellLocation(cell='A1'))]
+
+    def get_format_overrides(self, context: dict) -> dict:
+        return {}
+```
+
 ## See Also
 
 - [API Reference](../api/gsheets.md) - Full API documentation

@@ -47,8 +47,8 @@ class WorksheetRegistry:
     Example:
         >>> WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
         >>> worksheets = WorksheetRegistry.get_ordered_worksheets()
-        >>> [ws.name for ws in worksheets]
-        ['Summary', 'Revenue', 'Expenses']
+        >>> len(worksheets)
+        3
 
         # Or register one at a time:
         >>> WorksheetRegistry.register(SummaryWorksheet())
@@ -138,9 +138,9 @@ class WorksheetRegistry:
 
         Example:
             >>> WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
-            >>> WorksheetRegistry.reorder(['Expenses', 'Summary', 'Revenue'])
-            >>> [ws.name for ws in WorksheetRegistry.get_ordered_worksheets()]
-            ['Expenses', 'Summary', 'Revenue']
+            >>> WorksheetRegistry.reorder(["Expenses", "Summary", "Revenue"])
+            >>> WorksheetRegistry.get_ordered_worksheets()[0].name
+            "Expenses"
         """
         with cls._lock:
             registered = set(cls._worksheets.keys())
