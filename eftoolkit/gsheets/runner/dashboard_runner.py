@@ -285,28 +285,111 @@ class DashboardRunner:
         """
         logger.info('Phase 4: Applying formatting')
 
+        # Collect worksheets that have formatting
+        worksheets_with_formatting = []
         for worksheet_def in self.worksheets:
             formatting = worksheet_def.get_formatting(self.context)
             if formatting is None:
                 logger.info('  No formatting for %s', worksheet_def.name)
                 continue
+            worksheets_with_formatting.append((worksheet_def, formatting))
 
-            # Build format dict from file and/or inline config
-            format_dict = None
-            if formatting.format_config_path:
-                format_dict = load_json_config(formatting.format_config_path)
-            if formatting.format_dict:
-                format_dict = {**(format_dict or {}), **formatting.format_dict}
+        if not worksheets_with_formatting:
+            logger.info('  No worksheets have formatting to apply')
+            return
 
-            logger.info(
-                '  Formatting for %s: freeze_rows=%s, freeze_columns=%s, '
-                'auto_resize=%s, format_dict=%s',
-                worksheet_def.name,
-                formatting.freeze_rows,
-                formatting.freeze_columns,
-                formatting.auto_resize_columns,
-                format_dict is not None,
-            )
+        # Open spreadsheet context to apply formatting
+        with Spreadsheet(
+            credentials=self.credentials if not self.local_preview else None,
+            spreadsheet_name=self.config['sheet_name'],
+            local_preview=self.local_preview,
+        ) as ss:
+            for worksheet_def, formatting in worksheets_with_formatting:
+                ws = ss.worksheet(worksheet_def.name)
+                self._apply_worksheet_formatting(ws, formatting, worksheet_def.name)
+
+    def _apply_worksheet_formatting(
+        self,
+        ws: Any,
+        formatting: Any,
+        worksheet_name: str,
+    ) -> None:
+        """Apply WorksheetFormatting to a worksheet.
+
+        Args:
+            ws: Worksheet instance to apply formatting to.
+            formatting: WorksheetFormatting instance with formatting settings.
+            worksheet_name: Name of the worksheet (for logging).
+        """
+        # Build format dict from file and/or inline config
+        format_dict = None
+        if formatting.format_config_path:
+            format_dict = load_json_config(formatting.format_config_path)
+        if formatting.format_dict:
+            format_dict = {**(format_dict or {}), **formatting.format_dict}
+
+        logger.info(
+            '  Formatting for %s: freeze_rows=%s, freeze_columns=%s, '
+            'auto_resize=%s, format_dict=%s',
+            worksheet_name,
+            formatting.freeze_rows,
+            formatting.freeze_columns,
+            formatting.auto_resize_columns,
+            format_dict is not None,
+        )
+
+        # Apply freeze rows
+        if formatting.freeze_rows is not None:
+            ws.freeze_rows(formatting.freeze_rows)
+
+        # Apply freeze columns
+        if formatting.freeze_columns is not None:
+            ws.freeze_columns(formatting.freeze_columns)
+
+        # Apply auto-resize columns
+        if formatting.auto_resize_columns is not None:
+            start_col, end_col = formatting.auto_resize_columns
+            ws.auto_resize_columns(start_col, end_col)
+
+        # Apply merge ranges
+        for merge_range in formatting.merge_ranges:
+            ws.merge_cells(merge_range)
+
+        # Apply notes
+        if formatting.notes:
+            # Convert CellType keys to strings for the API
+            notes_dict = {}
+            for cell, note in formatting.notes.items():
+                cell_str = cell.value if hasattr(cell, 'value') else cell
+                notes_dict[cell_str] = note
+            ws.set_notes(notes_dict)
+
+        # Apply column widths
+        for column, width in formatting.column_widths.items():
+            ws.set_column_width(column, width)
+
+        # Apply borders
+        for range_key, border_config in formatting.borders.items():
+            ws.set_borders(range_key, border_config)
+
+        # Apply conditional formats
+        for cf_rule in formatting.conditional_formats:
+            # conditional_formats contains dicts with 'range' and other fields
+            range_str = cf_rule.get('range', '')
+            rule = {k: v for k, v in cf_rule.items() if k != 'range'}
+            ws.add_conditional_format(range_str, rule)
+
+        # Apply data validations
+        for dv_rule in formatting.data_validations:
+            # data_validations contains dicts with 'range' and other fields
+            range_str = dv_rule.get('range', '')
+            rule = {k: v for k, v in dv_rule.items() if k != 'range'}
+            ws.set_data_validation(range_str, rule)
+
+        # Apply format_dict (cell formatting)
+        if format_dict:
+            for range_name, fmt in format_dict.items():
+                ws.format_range(range_name, fmt)
 
     def _phase_5_log_summary(self) -> None:
         """Phase 5: Log run summary."""

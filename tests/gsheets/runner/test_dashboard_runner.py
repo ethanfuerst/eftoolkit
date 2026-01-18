@@ -179,7 +179,7 @@ def test_phase_4_apply_formatting_with_formatting():
     """Phase 4 applies formatting when get_formatting returns WorksheetFormatting."""
     formatting = WorksheetFormatting(
         freeze_rows=1,
-        format_dict={'color': 'blue'},
+        format_dict={'A1:B1': {'bold': True}},
     )
     ws = MockWorksheetDefinition('Formatted', formatting=formatting)
 
@@ -190,8 +190,19 @@ def test_phase_4_apply_formatting_with_formatting():
     )
 
     runner._phase_2_generate_data()
-    # Phase 4 logs formatting info; verify no exceptions
-    runner._phase_4_apply_formatting()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.freeze_rows.assert_called_once_with(1)
+        mock_worksheet.format_range.assert_called_once_with('A1:B1', {'bold': True})
 
 
 def test_phase_4_apply_formatting_with_none():
@@ -211,7 +222,7 @@ def test_phase_4_apply_formatting_with_none():
 def test_phase_4_apply_formatting_with_config_path(tmp_path, caplog):
     """Phase 4 loads formatting from format_config_path."""
     format_file = tmp_path / 'format.json'
-    format_file.write_text('{"header_color": "#4a86e8"}')
+    format_file.write_text('{"A1:B1": {"bold": true}}')
 
     formatting = WorksheetFormatting(format_config_path=format_file)
     ws = MockWorksheetDefinition('WithConfigPath', formatting=formatting)
@@ -228,12 +239,21 @@ def test_phase_4_apply_formatting_with_config_path(tmp_path, caplog):
         patch(
             'eftoolkit.gsheets.runner.dashboard_runner.load_json_config'
         ) as mock_load,
+        patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss,
         caplog.at_level(logging.INFO),
     ):
-        mock_load.return_value = {'header_color': '#4a86e8'}
+        mock_load.return_value = {'A1:B1': {'bold': True}}
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
         runner._phase_4_apply_formatting()
 
         mock_load.assert_called_once_with(format_file)
+        mock_worksheet.format_range.assert_called_once_with('A1:B1', {'bold': True})
 
 
 def test_phase_4_merges_config_path_and_format_dict(tmp_path):
@@ -242,7 +262,7 @@ def test_phase_4_merges_config_path_and_format_dict(tmp_path):
 
     formatting = WorksheetFormatting(
         format_config_path=format_file,
-        format_dict={'color': 'blue', 'bold': True},  # Override color, add bold
+        format_dict={'A1:B1': {'color': 'blue'}},  # Override color
     )
     ws = MockWorksheetDefinition('Merged', formatting=formatting)
 
@@ -254,13 +274,25 @@ def test_phase_4_merges_config_path_and_format_dict(tmp_path):
 
     runner._phase_2_generate_data()
 
-    with patch(
-        'eftoolkit.gsheets.runner.dashboard_runner.load_json_config'
-    ) as mock_load:
-        mock_load.return_value = {'color': 'red', 'size': 12}
+    with (
+        patch(
+            'eftoolkit.gsheets.runner.dashboard_runner.load_json_config'
+        ) as mock_load,
+        patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss,
+    ):
+        mock_load.return_value = {'A1:B1': {'color': 'red'}, 'C1:D1': {'size': 12}}
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
         runner._phase_4_apply_formatting()
 
         mock_load.assert_called_once_with(format_file)
+        # Merged dict should have both ranges, with format_dict overriding color
+        assert mock_worksheet.format_range.call_count == 2
 
 
 def test_phase_3_runs_hooks_with_context():
@@ -705,3 +737,303 @@ def test_init_defaults_pre_run_hooks_to_empty_list():
     )
 
     assert runner.pre_run_hooks == []
+
+
+def test_phase_4_applies_freeze_columns():
+    """Phase 4 applies freeze_columns from WorksheetFormatting."""
+    formatting = WorksheetFormatting(freeze_columns=2)
+    ws = MockWorksheetDefinition('WithFreezeColumns', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.freeze_columns.assert_called_once_with(2)
+
+
+def test_phase_4_applies_auto_resize_columns():
+    """Phase 4 applies auto_resize_columns from WorksheetFormatting."""
+    formatting = WorksheetFormatting(auto_resize_columns=(1, 5))
+    ws = MockWorksheetDefinition('WithAutoResize', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.auto_resize_columns.assert_called_once_with(1, 5)
+
+
+def test_phase_4_applies_merge_ranges():
+    """Phase 4 applies merge_ranges from WorksheetFormatting."""
+    formatting = WorksheetFormatting(merge_ranges=['A1:C1', 'B5:D5'])
+    ws = MockWorksheetDefinition('WithMergeRanges', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        assert mock_worksheet.merge_cells.call_count == 2
+        mock_worksheet.merge_cells.assert_any_call('A1:C1')
+        mock_worksheet.merge_cells.assert_any_call('B5:D5')
+
+
+def test_phase_4_applies_notes():
+    """Phase 4 applies notes from WorksheetFormatting."""
+    formatting = WorksheetFormatting(notes={'A1': 'Header note', 'B2': 'Data note'})
+    ws = MockWorksheetDefinition('WithNotes', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.set_notes.assert_called_once_with(
+            {'A1': 'Header note', 'B2': 'Data note'}
+        )
+
+
+def test_phase_4_applies_notes_with_cell_location():
+    """Phase 4 converts CellLocation keys to strings for notes."""
+    formatting = WorksheetFormatting(
+        notes={CellLocation(cell='A1'): 'Typed note', 'B2': 'String note'}
+    )
+    ws = MockWorksheetDefinition('WithTypedNotes', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.set_notes.assert_called_once_with(
+            {'A1': 'Typed note', 'B2': 'String note'}
+        )
+
+
+def test_phase_4_applies_column_widths():
+    """Phase 4 applies column_widths from WorksheetFormatting."""
+    formatting = WorksheetFormatting(column_widths={'A': 100, 'B': 150})
+    ws = MockWorksheetDefinition('WithColumnWidths', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        assert mock_worksheet.set_column_width.call_count == 2
+
+
+def test_phase_4_applies_borders():
+    """Phase 4 applies borders from WorksheetFormatting."""
+    formatting = WorksheetFormatting(borders={'A1:C10': {'style': 'solid'}})
+    ws = MockWorksheetDefinition('WithBorders', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.set_borders.assert_called_once_with('A1:C10', {'style': 'solid'})
+
+
+def test_phase_4_applies_conditional_formats():
+    """Phase 4 applies conditional_formats from WorksheetFormatting."""
+    formatting = WorksheetFormatting(
+        conditional_formats=[
+            {'range': 'B2:B10', 'type': 'CUSTOM_FORMULA', 'values': ['=B2>100']}
+        ]
+    )
+    ws = MockWorksheetDefinition('WithConditionalFormats', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.add_conditional_format.assert_called_once_with(
+            'B2:B10', {'type': 'CUSTOM_FORMULA', 'values': ['=B2>100']}
+        )
+
+
+def test_phase_4_applies_data_validations():
+    """Phase 4 applies data_validations from WorksheetFormatting."""
+    formatting = WorksheetFormatting(
+        data_validations=[
+            {'range': 'D1:D10', 'type': 'ONE_OF_LIST', 'values': ['A', 'B']}
+        ]
+    )
+    ws = MockWorksheetDefinition('WithDataValidations', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.set_data_validation.assert_called_once_with(
+            'D1:D10', {'type': 'ONE_OF_LIST', 'values': ['A', 'B']}
+        )
+
+
+def test_phase_4_applies_all_formatting_options():
+    """Phase 4 applies all WorksheetFormatting options together."""
+    formatting = WorksheetFormatting(
+        freeze_rows=1,
+        freeze_columns=1,
+        auto_resize_columns=(0, 5),
+        merge_ranges=['A1:C1'],
+        notes={'A1': 'Note'},
+        column_widths={'A': 100},
+        borders={'A1:C10': {'style': 'solid'}},
+        conditional_formats=[{'range': 'B2:B10', 'type': 'CUSTOM_FORMULA'}],
+        data_validations=[{'range': 'D1:D10', 'type': 'ONE_OF_LIST'}],
+        format_dict={'A1:B1': {'bold': True}},
+    )
+    ws = MockWorksheetDefinition('AllOptions', formatting=formatting)
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    runner._phase_2_generate_data()
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_4_apply_formatting()
+
+        mock_worksheet.freeze_rows.assert_called_once_with(1)
+        mock_worksheet.freeze_columns.assert_called_once_with(1)
+        mock_worksheet.auto_resize_columns.assert_called_once_with(0, 5)
+        mock_worksheet.merge_cells.assert_called_once_with('A1:C1')
+        mock_worksheet.set_notes.assert_called_once()
+        mock_worksheet.set_column_width.assert_called_once()
+        mock_worksheet.set_borders.assert_called_once()
+        mock_worksheet.add_conditional_format.assert_called_once()
+        mock_worksheet.set_data_validation.assert_called_once()
+        mock_worksheet.format_range.assert_called_once()
