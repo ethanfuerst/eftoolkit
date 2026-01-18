@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from pandas import DataFrame
 
 from eftoolkit.gsheets.runner.types.cell_location import CellLocation
+from eftoolkit.gsheets.runner.types.cell_range import CellRange
 from eftoolkit.gsheets.utils import column_index_to_letter
 
 if TYPE_CHECKING:
@@ -33,11 +34,11 @@ class WorksheetAsset:
             The HookContext provides access to the worksheet, asset, and runner context.
 
     Computed Properties:
-        header_range: A1-notation range for the header row (e.g., 'B4:E4').
-        data_range: A1-notation range for data rows excluding header (e.g., 'B5:E14').
-        full_range: A1-notation range for header + data (e.g., 'B4:E14').
-        column_ranges: Dict mapping column name to full column range including header.
-        data_column_ranges: Dict mapping column name to data-only column range.
+        header_range: CellRange for the header row (e.g., 'B4:E4').
+        data_range: CellRange for data rows excluding header (e.g., 'B5:E14').
+        full_range: CellRange for header + data (e.g., 'B4:E14').
+        column_ranges: Dict mapping column name to CellRange including header.
+        data_column_ranges: Dict mapping column name to data-only CellRange.
         num_rows: Number of data rows (excluding header).
         num_cols: Number of columns.
         start_row: 1-based row index of the header row.
@@ -47,8 +48,8 @@ class WorksheetAsset:
 
     Example:
         >>> def my_hook(ctx: HookContext) -> None:
-        ...     # Use computed ranges for formatting
-        ...     ctx.worksheet.format_range(ctx.asset.header_range, {'bold': True})
+        ...     # Use computed ranges for formatting (use .value for API calls)
+        ...     ctx.worksheet.format_range(ctx.asset.header_range.value, {'bold': True})
         ...
         >>> asset = WorksheetAsset(
         ...     df=my_dataframe,
@@ -96,56 +97,67 @@ class WorksheetAsset:
         return column_index_to_letter(self.location.col + self.num_cols - 1)
 
     @property
-    def header_range(self) -> str:
-        """A1-notation range for the header row.
+    def header_range(self) -> CellRange:
+        """CellRange for the header row.
 
         Example: 'B4:E4' for a 4-column DataFrame starting at B4.
+        Use .value to get the A1-notation string for API calls.
         """
-        return f'{self.start_col}{self.start_row}:{self.end_col}{self.start_row}'
+        return CellRange.from_string(
+            f'{self.start_col}{self.start_row}:{self.end_col}{self.start_row}'
+        )
 
     @property
-    def data_range(self) -> str:
-        """A1-notation range for data rows (excluding header).
+    def data_range(self) -> CellRange:
+        """CellRange for data rows (excluding header).
 
         Example: 'B5:E14' for a 10-row, 4-column DataFrame starting at B4.
         Returns empty range (same start and end) if DataFrame has no rows.
+        Use .value to get the A1-notation string for API calls.
         """
         data_start_row = self.start_row + 1
-        return f'{self.start_col}{data_start_row}:{self.end_col}{self.end_row}'
+        return CellRange.from_string(
+            f'{self.start_col}{data_start_row}:{self.end_col}{self.end_row}'
+        )
 
     @property
-    def full_range(self) -> str:
-        """A1-notation range for header + data.
+    def full_range(self) -> CellRange:
+        """CellRange for header + data.
 
         Example: 'B4:E14' for a 10-row, 4-column DataFrame starting at B4.
+        Use .value to get the A1-notation string for API calls.
         """
-        return f'{self.start_col}{self.start_row}:{self.end_col}{self.end_row}'
+        return CellRange.from_string(
+            f'{self.start_col}{self.start_row}:{self.end_col}{self.end_row}'
+        )
 
     @property
-    def column_ranges(self) -> dict[str, str]:
-        """Dict mapping column name to full column range (including header).
+    def column_ranges(self) -> dict[str, CellRange]:
+        """Dict mapping column name to CellRange (including header).
 
-        Example: {'Name': 'B4:B14', 'Score': 'C4:C14'} for columns starting at B4.
+        Example: {'Name': CellRange('B4:B14'), 'Score': CellRange('C4:C14')}.
+        Use .value on each CellRange to get the A1-notation string for API calls.
         """
-        result = {}
+        result: dict[str, CellRange] = {}
         for i, col_name in enumerate(self.df.columns):
             col_letter = column_index_to_letter(self.location.col + i)
-            result[col_name] = (
+            result[col_name] = CellRange.from_string(
                 f'{col_letter}{self.start_row}:{col_letter}{self.end_row}'
             )
         return result
 
     @property
-    def data_column_ranges(self) -> dict[str, str]:
-        """Dict mapping column name to data-only column range (excluding header).
+    def data_column_ranges(self) -> dict[str, CellRange]:
+        """Dict mapping column name to data-only CellRange (excluding header).
 
-        Example: {'Name': 'B5:B14', 'Score': 'C5:C14'} for columns starting at B4.
+        Example: {'Name': CellRange('B5:B14'), 'Score': CellRange('C5:C14')}.
+        Use .value on each CellRange to get the A1-notation string for API calls.
         """
-        result = {}
+        result: dict[str, CellRange] = {}
         data_start_row = self.start_row + 1
         for i, col_name in enumerate(self.df.columns):
             col_letter = column_index_to_letter(self.location.col + i)
-            result[col_name] = (
+            result[col_name] = CellRange.from_string(
                 f'{col_letter}{data_start_row}:{col_letter}{self.end_row}'
             )
         return result

@@ -532,15 +532,15 @@ The `HookContext` provides:
 
 #### WorksheetAsset Computed Ranges
 
-`WorksheetAsset` provides computed properties for easy access to cell ranges, eliminating the need to manually calculate ranges based on location and DataFrame dimensions:
+`WorksheetAsset` provides computed properties that return `CellRange` objects for easy access to cell ranges, eliminating the need to manually calculate ranges based on location and DataFrame dimensions:
 
 | Property | Type | Description | Example |
 |----------|------|-------------|---------|
-| `header_range` | `str` | A1-notation range for the header row | `'B4:E4'` |
-| `data_range` | `str` | A1-notation range for data rows (excluding header) | `'B5:E14'` |
-| `full_range` | `str` | A1-notation range for header + data | `'B4:E14'` |
-| `column_ranges` | `dict[str, str]` | Column name → full column range (including header) | `{'Name': 'B4:B14'}` |
-| `data_column_ranges` | `dict[str, str]` | Column name → data-only range (excluding header) | `{'Name': 'B5:B14'}` |
+| `header_range` | `CellRange` | Range for the header row | `CellRange('B4:E4')` |
+| `data_range` | `CellRange` | Range for data rows (excluding header) | `CellRange('B5:E14')` |
+| `full_range` | `CellRange` | Range for header + data | `CellRange('B4:E14')` |
+| `column_ranges` | `dict[str, CellRange]` | Column name → full column range (including header) | `{'Name': CellRange('B4:B14')}` |
+| `data_column_ranges` | `dict[str, CellRange]` | Column name → data-only range (excluding header) | `{'Name': CellRange('B5:B14')}` |
 | `num_rows` | `int` | Number of data rows (excluding header) | `10` |
 | `num_cols` | `int` | Number of columns | `4` |
 | `start_row` | `int` | 1-based row index of header row | `4` |
@@ -548,25 +548,30 @@ The `HookContext` provides:
 | `start_col` | `str` | Letter of first column | `'B'` |
 | `end_col` | `str` | Letter of last column | `'E'` |
 
-Example using computed ranges in hooks:
+Example using computed ranges in hooks (use `.value` for API calls):
 
 ```python
 def format_header(ctx: HookContext) -> None:
     """Bold the header row using computed range."""
-    ctx.worksheet.format_range(ctx.asset.header_range, {'textFormat': {'bold': True}})
+    ctx.worksheet.format_range(ctx.asset.header_range.value, {'textFormat': {'bold': True}})
 
 def format_currency_column(ctx: HookContext) -> None:
     """Apply currency format to the Amount column."""
     amount_range = ctx.asset.data_column_ranges['Amount']
-    ctx.worksheet.format_range(amount_range, {
+    ctx.worksheet.format_range(amount_range.value, {
         'numberFormat': {'type': 'CURRENCY', 'pattern': '$#,##0.00'}
     })
 
 def highlight_data_area(ctx: HookContext) -> None:
     """Add background color to all data rows."""
-    ctx.worksheet.format_range(ctx.asset.data_range, {
+    ctx.worksheet.format_range(ctx.asset.data_range.value, {
         'backgroundColor': {'red': 0.95, 'green': 0.95, 'blue': 0.95}
     })
+
+def log_range_info(ctx: HookContext) -> None:
+    """Access range computed properties."""
+    r = ctx.asset.full_range
+    print(f'Range {r.value} has {r.num_rows} rows and {r.num_cols} cols')
 ```
 
 #### CellLocation Properties
@@ -579,6 +584,7 @@ def highlight_data_area(ctx: HookContext) -> None:
 | `col` | `int` | 0-indexed column number | `1` |
 | `row_1indexed` | `int` | 1-indexed row number (for Google Sheets API) | `4` |
 | `col_letter` | `str` | Column letter(s) | `'B'` |
+| `value` | `str` | String representation (same as `str()`) | `'B4'` |
 
 Example usage:
 
@@ -588,7 +594,76 @@ location.row          # 9 (0-indexed)
 location.col          # 26 (0-indexed, AA = 26)
 location.row_1indexed # 10 (1-indexed)
 location.col_letter   # 'AA'
+location.value        # 'AA10'
+str(location)         # 'AA10'
 ```
+
+#### CellRange Type
+
+`CellRange` represents a range of cells in A1 notation with computed properties:
+
+```python
+from eftoolkit.gsheets.runner import CellRange
+
+# Parse from A1 notation
+cell_range = CellRange.from_string('B4:E14')
+
+# Or create from 0-indexed bounds
+cell_range = CellRange.from_bounds(start_row=3, start_col=1, end_row=13, end_col=4)
+```
+
+| Property | Type | Description | Example (`'B4:E14'`) |
+|----------|------|-------------|----------------------|
+| `start_row` | `int` | 0-indexed start row | `3` |
+| `end_row` | `int` | 0-indexed end row | `13` |
+| `start_col` | `int` | 0-indexed start column | `1` |
+| `end_col` | `int` | 0-indexed end column | `4` |
+| `start_row_1indexed` | `int` | 1-indexed start row | `4` |
+| `end_row_1indexed` | `int` | 1-indexed end row | `14` |
+| `start_col_letter` | `str` | Start column letter(s) | `'B'` |
+| `end_col_letter` | `str` | End column letter(s) | `'E'` |
+| `num_rows` | `int` | Number of rows in range | `11` |
+| `num_cols` | `int` | Number of columns in range | `4` |
+| `is_single_cell` | `bool` | True if range is a single cell | `False` |
+| `value` | `str` | A1 notation string (same as `str()`) | `'B4:E14'` |
+
+Single cells are represented as `CellRange` where `start == end`:
+
+```python
+single = CellRange.from_string('A1')
+single.is_single_cell  # True
+single.num_rows        # 1
+single.num_cols        # 1
+single.value           # 'A1' (not 'A1:A1')
+str(single)            # 'A1' (same as .value)
+```
+
+Use `.value` or `str()` to convert back to A1 notation for API calls:
+
+```python
+cell_range = CellRange.from_string('B4:E14')
+cell_range.value  # 'B4:E14'
+str(cell_range)   # 'B4:E14'
+```
+
+Check if a cell or range is within a range using the `in` operator:
+
+```python
+from eftoolkit.gsheets.runner import CellLocation, CellRange
+
+outer = CellRange.from_string('B4:E14')
+
+# Check if a CellLocation is within the range
+CellLocation(cell='C5') in outer   # True (inside range)
+CellLocation(cell='A1') in outer   # False (outside range)
+
+# Check if a CellRange is fully contained within another range
+CellRange.from_string('C5:D10') in outer  # True (fully inside)
+CellRange.from_string('A1:C5') in outer   # False (extends outside)
+CellRange.from_string('B4:E14') in outer  # True (exact match)
+```
+
+This is useful for validating that formatting operations target ranges within an asset's bounds.
 
 ### Local Preview Mode
 

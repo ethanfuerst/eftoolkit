@@ -4,6 +4,7 @@ from eftoolkit.gsheets.runner.dashboard_runner import DashboardRunner
 from eftoolkit.gsheets.runner.registry import WorksheetRegistry
 from eftoolkit.gsheets.runner.types import (
     CellLocation,
+    CellRange,
     HookContext,
     WorksheetAsset,
     WorksheetDefinition,
@@ -12,6 +13,7 @@ from eftoolkit.gsheets.runner.types import (
 
 __all__ = [
     'CellLocation',
+    'CellRange',
     'DashboardRunner',
     'HookContext',
     'WorksheetAsset',
