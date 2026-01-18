@@ -62,6 +62,7 @@ from eftoolkit.gsheets.runner import (
     DashboardRunner,
     WorksheetRegistry,
     CellLocation,
+    HookContext,
     WorksheetAsset,
     WorksheetDefinition,
     WorksheetFormatting,
@@ -96,6 +97,13 @@ from eftoolkit.gsheets.runner import (
 ### CellLocation
 
 ::: eftoolkit.gsheets.runner.types.cell_location.CellLocation
+    options:
+      show_root_heading: true
+      show_source: true
+
+### HookContext
+
+::: eftoolkit.gsheets.runner.types.hook_context.HookContext
     options:
       show_root_heading: true
       show_source: true

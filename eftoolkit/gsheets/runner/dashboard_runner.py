@@ -1,13 +1,12 @@
-"""DashboardRunner: 6-phase workflow orchestrator.
+"""DashboardRunner: 5-phase workflow orchestrator.
 
 Orchestrates the complete workflow for updating Google Sheets dashboards:
 
 1. Validate structure (worksheets exist, permissions)
 2. Generate all DataFrames (pure data phase, no API calls)
-3. Write all DataFrames to worksheets (I/O phase)
+3. Write all DataFrames to worksheets and run post-write hooks (I/O phase)
 4. Apply formatting (formatting phase)
-5. Run post-write hooks
-6. Log summary
+5. Log summary
 
 Example usage:
     from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
@@ -32,7 +31,11 @@ from typing import Any
 
 from eftoolkit.gsheets.core import Spreadsheet
 from eftoolkit.gsheets.runner.registry import WorksheetRegistry
-from eftoolkit.gsheets.runner.types import WorksheetAsset, WorksheetDefinition
+from eftoolkit.gsheets.runner.types import (
+    HookContext,
+    WorksheetAsset,
+    WorksheetDefinition,
+)
 from eftoolkit.gsheets.utils import load_json_config
 
 logger = logging.getLogger(__name__)
@@ -103,15 +106,14 @@ class DashboardRunner:
         self.results: dict[str, list[WorksheetAsset]] = {}
 
     def run(self) -> None:
-        """Execute the full 6-phase workflow.
+        """Execute the full 5-phase workflow.
 
         Phases:
             1. Validate structure
             2. Generate data
-            3. Write data
+            3. Write data and run hooks
             4. Apply formatting
-            5. Run hooks
-            6. Log summary
+            5. Log summary
 
         Raises:
             Exception: Re-raises any exception from individual phases.
@@ -120,10 +122,9 @@ class DashboardRunner:
 
         self._phase_1_validate_structure()
         self._phase_2_generate_data()
-        self._phase_3_write_data()
+        self._phase_3_write_data_and_run_hooks()
         self._phase_4_apply_formatting()
-        self._phase_5_run_hooks()
-        self._phase_6_log_summary()
+        self._phase_5_log_summary()
 
         logger.info('Dashboard run complete')
 
@@ -171,12 +172,14 @@ class DashboardRunner:
 
         logger.info('  Generated %d worksheets', len(self.results))
 
-    def _phase_3_write_data(self) -> None:
-        """Phase 3: Write all DataFrames to worksheets.
+    def _phase_3_write_data_and_run_hooks(self) -> None:
+        """Phase 3: Write all DataFrames and run post-write hooks.
 
         Opens the spreadsheet and writes each asset to its worksheet.
         Creates worksheets if they don't exist. Data is written without
-        formatting; formatting is applied in Phase 4.
+        formatting; formatting is applied in Phase 4. Post-write hooks
+        are executed within the same spreadsheet context so they can
+        access the worksheet.
         """
         logger.info('Phase 3: Writing data')
 
@@ -185,8 +188,12 @@ class DashboardRunner:
             spreadsheet_name=self.config['sheet_name'],
             local_preview=self.local_preview,
         ) as ss:
+            # Store worksheet instances for hook execution
+            worksheet_instances: dict[str, Any] = {}
+
             for worksheet_def in self.worksheets:
                 ws = ss.create_worksheet(worksheet_def.name, replace=True)
+                worksheet_instances[worksheet_def.name] = ws
 
                 for asset in self.results[worksheet_def.name]:
                     ws.write_dataframe(
@@ -199,6 +206,29 @@ class DashboardRunner:
                         worksheet_def.name,
                         asset.location.cell,
                     )
+
+            # Run hooks within the same spreadsheet context
+            logger.info('Phase 3b: Running hooks')
+            hook_count = 0
+            for worksheet_def in self.worksheets:
+                ws = worksheet_instances[worksheet_def.name]
+                for asset in self.results[worksheet_def.name]:
+                    for hook in asset.post_write_hooks:
+                        logger.info(
+                            '  Running hook for %s!%s',
+                            worksheet_def.name,
+                            asset.location.cell,
+                        )
+                        ctx = HookContext(
+                            worksheet=ws,
+                            asset=asset,
+                            worksheet_name=worksheet_def.name,
+                            runner_context=self.context,
+                        )
+                        hook(ctx)
+                        hook_count += 1
+
+            logger.info('  Executed %d hooks', hook_count)
 
     def _phase_4_apply_formatting(self) -> None:
         """Phase 4: Apply worksheet-level formatting.
@@ -232,30 +262,9 @@ class DashboardRunner:
                 format_dict is not None,
             )
 
-    def _phase_5_run_hooks(self) -> None:
-        """Phase 5: Run post-write hooks.
-
-        Executes post_write_hooks from each WorksheetAsset.
-        """
-        logger.info('Phase 5: Running hooks')
-
-        hook_count = 0
-        for worksheet_def in self.worksheets:
-            for asset in self.results[worksheet_def.name]:
-                for hook in asset.post_write_hooks:
-                    logger.info(
-                        '  Running hook for %s!%s',
-                        worksheet_def.name,
-                        asset.location.cell,
-                    )
-                    hook()
-                    hook_count += 1
-
-        logger.info('  Executed %d hooks', hook_count)
-
-    def _phase_6_log_summary(self) -> None:
-        """Phase 6: Log run summary."""
-        logger.info('Phase 6: Summary')
+    def _phase_5_log_summary(self) -> None:
+        """Phase 5: Log run summary."""
+        logger.info('Phase 5: Summary')
 
         total_rows = 0
         total_assets = 0

@@ -296,14 +296,13 @@ ss = Spreadsheet(
 
 ## Dashboard Runner
 
-For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 6-phase workflow:
+For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 5-phase workflow:
 
 1. **Validate structure** - Check spreadsheet access and permissions
 2. **Generate data** - Create all DataFrames (no API calls)
-3. **Write data** - Write DataFrames to worksheets
+3. **Write data and run hooks** - Write DataFrames to worksheets and execute post-write hooks
 4. **Apply formatting** - Apply worksheet-level formatting
-5. **Run hooks** - Execute post-write hooks
-6. **Log summary** - Report what was written
+5. **Log summary** - Report what was written
 
 ### Basic Usage
 
@@ -452,11 +451,24 @@ When both `format_config_path` and `format_dict` are provided, they are merged w
 
 ### Post-Write Hooks
 
-Execute callbacks after data is written (e.g., custom post-processing):
+Execute callbacks after data is written. Hooks receive a `HookContext` that provides access to the worksheet, asset, and runner context:
 
 ```python
-def add_conditional_formatting():
-    print('Adding conditional formatting...')
+from eftoolkit.gsheets.runner import HookContext
+
+def highlight_high_values(ctx: HookContext) -> None:
+    """Add conditional formatting to highlight values > 100."""
+    # Access the worksheet to apply formatting
+    ctx.worksheet.add_conditional_format('A2:A100', {
+        'type': 'NUMBER_GREATER',
+        'values': ['100'],
+        'format': {'backgroundColor': {'red': 1, 'green': 0.8, 'blue': 0.8}},
+    })
+    print(f'Applied formatting to {ctx.worksheet_name}')
+
+def log_row_count(ctx: HookContext) -> None:
+    """Log how many rows were written."""
+    print(f'Wrote {len(ctx.asset.df)} rows to {ctx.worksheet_name}!{ctx.asset.location.cell}')
 
 class HookedWorksheet:
     @property
@@ -464,17 +476,47 @@ class HookedWorksheet:
         return 'Hooked'
 
     def generate(self, config: dict, context: dict) -> list[WorksheetAsset]:
-        df = pd.DataFrame({'Value': [1, 2, 3]})
+        df = pd.DataFrame({'Value': [50, 150, 200, 75]})
         return [
             WorksheetAsset(
                 df=df,
                 location=CellLocation(cell='A1'),
-                post_write_hooks=[add_conditional_formatting],
+                post_write_hooks=[highlight_high_values, log_row_count],
             )
         ]
 
     def get_formatting(self, context: dict) -> WorksheetFormatting | None:
         return None
+```
+
+#### HookContext
+
+The `HookContext` provides:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `worksheet` | `Worksheet` | The worksheet instance for additional operations |
+| `asset` | `WorksheetAsset` | The asset that triggered this hook |
+| `worksheet_name` | `str` | Name of the worksheet definition |
+| `runner_context` | `dict` | Shared context dictionary from the DashboardRunner |
+
+Example using all context attributes:
+
+```python
+def advanced_hook(ctx: HookContext) -> None:
+    # Access the worksheet for formatting
+    num_rows = len(ctx.asset.df)
+    data_range = f'A1:B{num_rows + 1}'  # +1 for header
+    ctx.worksheet.format_range(data_range, {'textFormat': {'fontSize': 10}})
+
+    # Access data from other worksheets via runner_context
+    if 'Revenue' in ctx.runner_context:
+        revenue_rows = ctx.runner_context['Revenue']['total_rows']
+        print(f'Revenue sheet has {revenue_rows} rows')
+
+    # Access the asset's data
+    if ctx.asset.df['Value'].max() > 100:
+        ctx.worksheet.set_notes({'A1': 'Contains high values!'})
 ```
 
 ### Local Preview Mode
