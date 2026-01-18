@@ -471,3 +471,245 @@ def test_reorder_worksheets_empty_order_preserves_original():
     call_args = mock_gspread.reorder_worksheets.call_args[0][0]
 
     assert [ws.title for ws in call_args] == ['Alpha', 'Beta']
+
+
+# --- apply_formatting tests ---
+
+
+def test_apply_formatting_freeze_rows():
+    """apply_formatting() applies freeze_rows."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(freeze_rows=1)
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    assert any(req['type'] == 'freeze_rows' for req in ws._batch_requests)
+
+
+def test_apply_formatting_freeze_columns():
+    """apply_formatting() applies freeze_columns."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(freeze_columns=2)
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    assert any(req['type'] == 'freeze_columns' for req in ws._batch_requests)
+
+
+def test_apply_formatting_auto_resize():
+    """apply_formatting() applies auto_resize_columns."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(auto_resize_columns=(0, 5))
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    assert any(req['type'] == 'auto_resize' for req in ws._batch_requests)
+
+
+def test_apply_formatting_merge_ranges():
+    """apply_formatting() applies merge_ranges."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(merge_ranges=['A1:C1', 'B5:D5'])
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    merge_requests = [req for req in ws._batch_requests if req['type'] == 'merge']
+
+    assert len(merge_requests) == 2
+
+
+def test_apply_formatting_notes():
+    """apply_formatting() applies notes."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(notes={'A1': 'Header note', 'B2': 'Data note'})
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    notes_requests = [req for req in ws._batch_requests if req['type'] == 'notes']
+
+    assert len(notes_requests) == 1
+    assert notes_requests[0]['notes'] == {'A1': 'Header note', 'B2': 'Data note'}
+
+
+def test_apply_formatting_notes_with_cell_location():
+    """apply_formatting() converts CellLocation keys to strings for notes."""
+    from eftoolkit.gsheets.runner import CellLocation, WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(
+        notes={CellLocation(cell='A1'): 'Typed note', 'B2': 'String note'}
+    )
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    notes_requests = [req for req in ws._batch_requests if req['type'] == 'notes']
+
+    assert notes_requests[0]['notes'] == {'A1': 'Typed note', 'B2': 'String note'}
+
+
+def test_apply_formatting_column_widths():
+    """apply_formatting() applies column_widths."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(column_widths={'A': 100, 'B': 150})
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    width_requests = [
+        req for req in ws._batch_requests if req['type'] == 'column_width'
+    ]
+
+    assert len(width_requests) == 2
+
+
+def test_apply_formatting_borders():
+    """apply_formatting() applies borders."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(borders={'A1:C10': {'style': 'solid'}})
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    border_requests = [req for req in ws._batch_requests if req['type'] == 'border']
+
+    assert len(border_requests) == 1
+
+
+def test_apply_formatting_conditional_formats():
+    """apply_formatting() applies conditional_formats."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(
+        conditional_formats=[{'range': 'B2:B10', 'type': 'CUSTOM_FORMULA'}]
+    )
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    cf_requests = [
+        req for req in ws._batch_requests if req['type'] == 'conditional_format'
+    ]
+
+    assert len(cf_requests) == 1
+
+
+def test_apply_formatting_data_validations():
+    """apply_formatting() applies data_validations."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(
+        data_validations=[{'range': 'D1:D10', 'type': 'ONE_OF_LIST'}]
+    )
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    dv_requests = [
+        req for req in ws._batch_requests if req['type'] == 'data_validation'
+    ]
+
+    assert len(dv_requests) == 1
+
+
+def test_apply_formatting_format_dict():
+    """apply_formatting() applies format_dict."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(format_dict={'A1:B1': {'bold': True}})
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+    format_requests = [req for req in ws._batch_requests if req['type'] == 'format']
+
+    assert len(format_requests) == 1
+
+
+def test_apply_formatting_provided_format_dict_overrides():
+    """apply_formatting() uses provided format_dict over formatting.format_dict."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(format_dict={'A1:B1': {'bold': True}})
+    # Provide merged format_dict with additional range
+    merged = {'A1:B1': {'bold': True}, 'C1:D1': {'italic': True}}
+    ss.apply_formatting('Sheet1', formatting, format_dict=merged)
+
+    ws = ss._worksheets['Sheet1']
+    format_requests = [req for req in ws._batch_requests if req['type'] == 'format']
+
+    assert len(format_requests) == 2
+
+
+def test_apply_formatting_all_options():
+    """apply_formatting() applies all WorksheetFormatting options together."""
+    from eftoolkit.gsheets.runner import WorksheetFormatting
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss.create_worksheet('Sheet1')
+
+    formatting = WorksheetFormatting(
+        freeze_rows=1,
+        freeze_columns=1,
+        auto_resize_columns=(0, 5),
+        merge_ranges=['A1:C1'],
+        notes={'A1': 'Note'},
+        column_widths={'A': 100},
+        borders={'A1:C10': {'style': 'solid'}},
+        conditional_formats=[{'range': 'B2:B10', 'type': 'CUSTOM_FORMULA'}],
+        data_validations=[{'range': 'D1:D10', 'type': 'ONE_OF_LIST'}],
+        format_dict={'A1:B1': {'bold': True}},
+    )
+    ss.apply_formatting('Sheet1', formatting)
+
+    ws = ss._worksheets['Sheet1']
+
+    # Verify all types of requests were queued
+    request_types = {req['type'] for req in ws._batch_requests}
+
+    assert 'freeze_rows' in request_types
+    assert 'freeze_columns' in request_types
+    assert 'auto_resize' in request_types
+    assert 'merge' in request_types
+    assert 'notes' in request_types
+    assert 'column_width' in request_types
+    assert 'border' in request_types
+    assert 'conditional_format' in request_types
+    assert 'data_validation' in request_types
+    assert 'format' in request_types

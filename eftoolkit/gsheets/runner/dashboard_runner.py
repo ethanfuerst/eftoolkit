@@ -280,33 +280,49 @@ class DashboardRunner:
         """Phase 4: Apply worksheet-level formatting.
 
         Calls get_formatting() on each worksheet definition and applies
-        the returned WorksheetFormatting configuration. This is called
-        once per worksheet after all data has been written.
+        the returned WorksheetFormatting configuration using Spreadsheet.apply_formatting().
+        This is called once per worksheet after all data has been written.
         """
         logger.info('Phase 4: Applying formatting')
 
+        # Collect worksheets that have formatting
+        worksheets_with_formatting = []
         for worksheet_def in self.worksheets:
             formatting = worksheet_def.get_formatting(self.context)
             if formatting is None:
                 logger.info('  No formatting for %s', worksheet_def.name)
                 continue
+            worksheets_with_formatting.append((worksheet_def, formatting))
 
-            # Build format dict from file and/or inline config
-            format_dict = None
-            if formatting.format_config_path:
-                format_dict = load_json_config(formatting.format_config_path)
-            if formatting.format_dict:
-                format_dict = {**(format_dict or {}), **formatting.format_dict}
+        if not worksheets_with_formatting:
+            logger.info('  No worksheets have formatting to apply')
+            return
 
-            logger.info(
-                '  Formatting for %s: freeze_rows=%s, freeze_columns=%s, '
-                'auto_resize=%s, format_dict=%s',
-                worksheet_def.name,
-                formatting.freeze_rows,
-                formatting.freeze_columns,
-                formatting.auto_resize_columns,
-                format_dict is not None,
-            )
+        # Open spreadsheet context to apply formatting
+        with Spreadsheet(
+            credentials=self.credentials if not self.local_preview else None,
+            spreadsheet_name=self.config['sheet_name'],
+            local_preview=self.local_preview,
+        ) as ss:
+            for worksheet_def, formatting in worksheets_with_formatting:
+                # Build format dict from file and/or inline config
+                format_dict = None
+                if formatting.format_config_path:
+                    format_dict = load_json_config(formatting.format_config_path)
+                if formatting.format_dict:
+                    format_dict = {**(format_dict or {}), **formatting.format_dict}
+
+                logger.info(
+                    '  Formatting for %s: freeze_rows=%s, freeze_columns=%s, '
+                    'auto_resize=%s, format_dict=%s',
+                    worksheet_def.name,
+                    formatting.freeze_rows,
+                    formatting.freeze_columns,
+                    formatting.auto_resize_columns,
+                    format_dict is not None,
+                )
+
+                ss.apply_formatting(worksheet_def.name, formatting, format_dict)
 
     def _phase_5_log_summary(self) -> None:
         """Phase 5: Log run summary."""
