@@ -28,6 +28,33 @@ def batch_handler(req_type: str) -> Callable:
     return decorator
 
 
+def column_index_to_letter(index: int) -> str:
+    """Convert a 0-indexed column index to Excel-style column letter(s).
+
+    Args:
+        index: 0-indexed column number (0=A, 1=B, ..., 25=Z, 26=AA, etc.)
+
+    Returns:
+        Column letter string (e.g., 'A', 'B', 'Z', 'AA', 'AB')
+
+    Example:
+        >>> column_index_to_letter(0)
+        'A'
+        >>> column_index_to_letter(25)
+        'Z'
+        >>> column_index_to_letter(26)
+        'AA'
+        >>> column_index_to_letter(27)
+        'AB'
+    """
+    result = ''
+    index += 1  # Convert to 1-indexed for calculation
+    while index > 0:
+        index, remainder = divmod(index - 1, 26)
+        result = chr(ord('A') + remainder) + result
+    return result
+
+
 def parse_cell_reference(cell_ref: str) -> tuple[int | None, int]:
     """Parse a cell reference like 'A1' or 'Sheet1!B2' into (row, col) 0-indexed.
 

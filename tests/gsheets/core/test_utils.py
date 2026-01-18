@@ -1,6 +1,29 @@
 """Tests for gsheets utility functions."""
 
-from eftoolkit.gsheets.utils import parse_cell_reference
+from eftoolkit.gsheets.utils import column_index_to_letter, parse_cell_reference
+
+# column_index_to_letter tests
+
+
+def test_column_index_to_letter_single_letters():
+    """Single letters A-Z (indices 0-25)."""
+    assert column_index_to_letter(0) == 'A'
+    assert column_index_to_letter(1) == 'B'
+    assert column_index_to_letter(25) == 'Z'
+
+
+def test_column_index_to_letter_double_letters():
+    """Double letters AA, AB, etc. (indices 26+)."""
+    assert column_index_to_letter(26) == 'AA'
+    assert column_index_to_letter(27) == 'AB'
+    assert column_index_to_letter(51) == 'AZ'
+    assert column_index_to_letter(52) == 'BA'
+
+
+def test_column_index_to_letter_triple_letters():
+    """Triple letters for very wide spreadsheets."""
+    # 26 + 26*26 = 702 is the first AAA
+    assert column_index_to_letter(702) == 'AAA'
 
 
 class TestParseCellReference:
