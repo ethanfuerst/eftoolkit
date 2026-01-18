@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 
 from pandas import DataFrame
 
-from eftoolkit.gsheets.runner.types.cell_location import CellLocation
-from eftoolkit.gsheets.runner.types.cell_range import CellRange
+from eftoolkit.gsheets.types import CellLocation, CellRange
 from eftoolkit.gsheets.utils import column_index_to_letter
 
 if TYPE_CHECKING:

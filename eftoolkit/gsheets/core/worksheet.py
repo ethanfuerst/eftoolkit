@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from eftoolkit.gsheets.types import CellLocation, CellRange, RangeType
 from eftoolkit.gsheets.utils import (
     BATCH_HANDLERS,
     batch_handler,
@@ -177,13 +178,13 @@ class Worksheet:
 
     def format_range(
         self,
-        range_name: str,
+        range_name: RangeType,
         format_dict: dict[str, Any],
     ) -> None:
         """Queue cell formatting.
 
         Args:
-            range_name: A1 notation range.
+            range_name: A1 notation range, CellLocation, or CellRange.
             format_dict: Format specification dict.
         """
         self._batch_requests.append(
@@ -196,13 +197,13 @@ class Worksheet:
 
     def set_borders(
         self,
-        range_name: str,
+        range_name: RangeType,
         borders: dict[str, Any],
     ) -> None:
         """Queue border formatting.
 
         Args:
-            range_name: A1 notation range.
+            range_name: A1 notation range, CellLocation, or CellRange.
             borders: Border specification dict.
         """
         self._batch_requests.append(
@@ -269,13 +270,13 @@ class Worksheet:
 
     def merge_cells(
         self,
-        range_name: str,
+        range_name: RangeType,
         merge_type: str = 'MERGE_ALL',
     ) -> None:
         """Queue cell merge.
 
         Args:
-            range_name: A1 notation range to merge (e.g., 'A1:C1').
+            range_name: A1 notation range, CellLocation, or CellRange to merge.
             merge_type: One of 'MERGE_ALL', 'MERGE_COLUMNS', 'MERGE_ROWS'.
         """
         self._batch_requests.append(
@@ -288,12 +289,12 @@ class Worksheet:
 
     def unmerge_cells(
         self,
-        range_name: str,
+        range_name: RangeType,
     ) -> None:
         """Queue cell unmerge.
 
         Args:
-            range_name: A1 notation range to unmerge.
+            range_name: A1 notation range, CellLocation, or CellRange to unmerge.
         """
         self._batch_requests.append(
             {
@@ -304,13 +305,13 @@ class Worksheet:
 
     def sort_range(
         self,
-        range_name: str,
+        range_name: RangeType,
         sort_specs: list[dict[str, Any]],
     ) -> None:
         """Queue range sort.
 
         Args:
-            range_name: A1 notation range to sort.
+            range_name: A1 notation range, CellLocation, or CellRange to sort.
             sort_specs: List of sort specifications. Each spec should have:
                 - 'column': 0-based column index within the range
                 - 'ascending': True for ascending, False for descending (default True)
@@ -328,13 +329,13 @@ class Worksheet:
 
     def set_data_validation(
         self,
-        range_name: str,
+        range_name: RangeType,
         rule: dict[str, Any],
     ) -> None:
         """Queue data validation rule.
 
         Args:
-            range_name: A1 notation range for validation.
+            range_name: A1 notation range, CellLocation, or CellRange for validation.
             rule: Validation rule dict. Common keys:
                 - 'type': 'ONE_OF_LIST', 'ONE_OF_RANGE', 'NUMBER_BETWEEN', etc.
                 - 'values': List of allowed values (for ONE_OF_LIST)
@@ -358,12 +359,12 @@ class Worksheet:
 
     def clear_data_validation(
         self,
-        range_name: str,
+        range_name: RangeType,
     ) -> None:
         """Queue removal of data validation rules.
 
         Args:
-            range_name: A1 notation range to clear validation from.
+            range_name: A1 notation range, CellLocation, or CellRange to clear.
         """
         self._batch_requests.append(
             {
@@ -374,13 +375,13 @@ class Worksheet:
 
     def add_conditional_format(
         self,
-        range_name: str,
+        range_name: RangeType,
         rule: dict[str, Any],
     ) -> None:
         """Queue conditional formatting rule.
 
         Args:
-            range_name: A1 notation range for conditional format.
+            range_name: A1 notation range, CellLocation, or CellRange.
             rule: Conditional format rule dict. Should contain:
                 - 'type': 'CUSTOM_FORMULA', 'NUMBER_GREATER', 'TEXT_CONTAINS', etc.
                 - 'values': Condition values (e.g., formula string)
@@ -561,6 +562,20 @@ class Worksheet:
         self._value_updates.clear()
         self._batch_requests.clear()
 
+    @staticmethod
+    def _resolve_range(range_value: RangeType) -> str:
+        """Convert CellLocation, CellRange, or string to A1 notation string.
+
+        Args:
+            range_value: A CellLocation, CellRange, or string in A1 notation.
+
+        Returns:
+            A1 notation string representation.
+        """
+        if isinstance(range_value, CellLocation | CellRange):
+            return range_value.value
+        return range_value
+
     def _flush_to_api(self) -> None:
         """Send queued operations to Google Sheets API."""
         if not self._ws:
@@ -593,8 +608,9 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#repeatcellrequest
         """
+        range_str = self._resolve_range(req['range'])
         self._spreadsheet._execute_with_retry(
-            lambda: self._ws.format(req['range'], req['format']),
+            lambda: self._ws.format(range_str, req['format']),
             'format',
         )
 
@@ -604,7 +620,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatebordersrequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         borders = req['borders']
         border_request = {
             'updateBorders': {
@@ -700,7 +717,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#mergecellsrequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         request = {
             'mergeCells': {
                 'range': range_obj,
@@ -720,7 +738,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#unmergecellsrequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         request = {
             'unmergeCells': {
                 'range': range_obj,
@@ -739,7 +758,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#sortrangerequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         sort_specs = [
             {
                 'dimensionIndex': spec['column'],
@@ -768,7 +788,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#setdatavalidationrequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         rule = req['rule']
 
         condition_type = rule.get('type', 'ONE_OF_LIST')
@@ -800,7 +821,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#setdatavalidationrequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         request = {
             'setDataValidation': {
                 'range': range_obj,
@@ -820,7 +842,8 @@ class Worksheet:
 
         API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#addconditionalformatrulerequest
         """
-        range_obj = self._parse_range_to_grid_range(req['range'])
+        range_str = self._resolve_range(req['range'])
+        range_obj = self._parse_range_to_grid_range(range_str)
         rule = req['rule']
 
         condition_type = rule.get('type', 'CUSTOM_FORMULA')

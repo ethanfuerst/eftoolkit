@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from eftoolkit.gsheets import Spreadsheet, Worksheet
+from eftoolkit.gsheets.types import CellLocation, CellRange
 
 
 def _create_mock_worksheet_with_api():
@@ -556,3 +557,171 @@ def test_read_range_returns_2d_list_for_multiple_columns():
     result = ws.read_range('A1:B2')
 
     assert result == [['a', 'b'], ['c', 'd']]
+
+
+# --- CellLocation and CellRange Support ---
+
+
+def test_format_range_with_cell_location():
+    """format_range accepts CellLocation and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    location = CellLocation(cell='B4')
+    ws.format_range(location, {'bold': True})
+    ws.flush()
+
+    mock_ws.format.assert_called_once_with('B4', {'bold': True})
+
+
+def test_format_range_with_cell_range():
+    """format_range accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('A1:C10')
+    ws.format_range(cell_range, {'bold': True})
+    ws.flush()
+
+    mock_ws.format.assert_called_once_with('A1:C10', {'bold': True})
+
+
+def test_set_borders_with_cell_range():
+    """set_borders accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('B2:D5')
+    borders = {'top': {'style': 'SOLID'}}
+    ws.set_borders(cell_range, borders)
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'updateBorders' in request
+    assert request['updateBorders']['range']['startRowIndex'] == 1  # B2 row (0-indexed)
+    assert request['updateBorders']['range']['startColumnIndex'] == 1  # B column
+
+
+def test_merge_cells_with_cell_range():
+    """merge_cells accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('A1:C1')
+    ws.merge_cells(cell_range, 'MERGE_ALL')
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'mergeCells' in request
+    assert request['mergeCells']['range']['startColumnIndex'] == 0
+    assert request['mergeCells']['range']['endColumnIndex'] == 3
+
+
+def test_unmerge_cells_with_cell_location():
+    """unmerge_cells accepts CellLocation and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    location = CellLocation(cell='A1')
+    ws.unmerge_cells(location)
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'unmergeCells' in request
+    assert request['unmergeCells']['range']['startRowIndex'] == 0
+    assert request['unmergeCells']['range']['startColumnIndex'] == 0
+
+
+def test_sort_range_with_cell_range():
+    """sort_range accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('A1:C10')
+    ws.sort_range(cell_range, [{'column': 0, 'ascending': True}])
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'sortRange' in request
+    assert request['sortRange']['range']['endRowIndex'] == 10
+
+
+def test_set_data_validation_with_cell_range():
+    """set_data_validation accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('A1:A10')
+    ws.set_data_validation(
+        cell_range,
+        {'type': 'ONE_OF_LIST', 'values': ['Yes', 'No']},
+    )
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'setDataValidation' in request
+    assert request['setDataValidation']['range']['endRowIndex'] == 10
+
+
+def test_clear_data_validation_with_cell_range():
+    """clear_data_validation accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('B2:B20')
+    ws.clear_data_validation(cell_range)
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'setDataValidation' in request
+    assert request['setDataValidation']['rule'] is None
+    assert request['setDataValidation']['range']['startColumnIndex'] == 1
+
+
+def test_add_conditional_format_with_cell_range():
+    """add_conditional_format accepts CellRange and evaluates at flush time."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    cell_range = CellRange.from_string('C1:C50')
+    ws.add_conditional_format(
+        cell_range,
+        {
+            'type': 'CUSTOM_FORMULA',
+            'values': ['=C1>100'],
+            'format': {'backgroundColor': {'red': 1, 'green': 0, 'blue': 0}},
+        },
+    )
+    ws.flush()
+
+    mock_gspread.batch_update.assert_called_once()
+    call_args = mock_gspread.batch_update.call_args[0][0]
+    request = call_args['requests'][0]
+
+    assert 'addConditionalFormatRule' in request
+    ranges = request['addConditionalFormatRule']['rule']['ranges']
+    assert ranges[0]['startColumnIndex'] == 2  # Column C
+
+
+def test_deferred_evaluation_cell_range_from_bounds():
+    """CellRange.from_bounds allows dynamic range computation before flush."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    # Simulate dynamic range computation
+    start_row, start_col = 3, 1  # B4
+    end_row, end_col = 13, 4  # E14
+    cell_range = CellRange.from_bounds(start_row, start_col, end_row, end_col)
+
+    ws.format_range(cell_range, {'bold': True})
+    ws.flush()
+
+    mock_ws.format.assert_called_once_with('B4:E14', {'bold': True})
