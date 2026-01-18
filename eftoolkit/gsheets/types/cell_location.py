@@ -12,14 +12,18 @@ class CellLocation:
     so CellLocation only needs the cell address within that worksheet.
 
     Attributes:
-        cell: The cell address where the DataFrame starts (e.g., 'B4', 'A1').
+        cell: The base cell address (e.g., 'B4', 'A1').
+        offset_rows: Number of rows to offset from the base cell. Positive moves down,
+            negative moves up. Defaults to 0.
+        offset_cols: Number of columns to offset from the base cell. Positive moves right,
+            negative moves left. Defaults to 0.
 
     Computed Properties:
-        row: 0-indexed row number (e.g., 'B4' → 3).
-        col: 0-indexed column number (e.g., 'B4' → 1).
-        row_1indexed: 1-indexed row number for Google Sheets API (e.g., 'B4' → 4).
-        col_letter: Column letter(s) (e.g., 'B4' → 'B', 'AA1' → 'AA').
-        value: String representation of the cell (same as cell attribute).
+        row: 0-indexed row number after applying offset.
+        col: 0-indexed column number after applying offset.
+        row_1indexed: 1-indexed row number for Google Sheets API after applying offset.
+        col_letter: Column letter(s) after applying offset.
+        value: String representation of the cell after applying offsets.
 
     Example:
         >>> location = CellLocation(cell='B4')
@@ -33,9 +37,22 @@ class CellLocation:
         4
         >>> location.col_letter
         'B'
+
+        >>> # With offsets
+        >>> offset_loc = CellLocation(cell='I2', offset_cols=1)
+        >>> offset_loc.value
+        'J2'
+        >>> CellLocation(cell='I2', offset_cols=-1).value
+        'H2'
+        >>> CellLocation(cell='I2', offset_rows=1).value
+        'I3'
+        >>> CellLocation(cell='I2', offset_rows=-1).value
+        'I1'
     """
 
     cell: str
+    offset_rows: int = 0
+    offset_cols: int = 0
 
     @staticmethod
     def _parse_cell(cell: str) -> tuple[str, int]:
@@ -66,53 +83,80 @@ class CellLocation:
             col = col * 26 + (ord(char) - ord('A') + 1)
         return col - 1
 
+    @staticmethod
+    def _col_index_to_letter(index: int) -> str:
+        """Convert 0-indexed column number to column letter(s).
+
+        Args:
+            index: 0-indexed column number (0=A, 1=B, 25=Z, 26=AA).
+
+        Returns:
+            Column letter(s) (e.g., 'A', 'B', 'AA').
+        """
+        result = ''
+        index += 1  # Convert to 1-indexed for calculation
+        while index > 0:
+            index, remainder = divmod(index - 1, 26)
+            result = chr(ord('A') + remainder) + result
+        return result
+
     @cached_property
     def _parsed(self) -> tuple[str, int]:
-        """Cached parsed cell reference."""
+        """Cached parsed cell reference (base cell without offsets)."""
         return self._parse_cell(self.cell)
 
-    @property
-    def col_letter(self) -> str:
-        """Column letter(s) from the cell reference.
+    @cached_property
+    def _base_col_index(self) -> int:
+        """0-indexed column number of the base cell (without offset)."""
+        return self._col_letter_to_index(self._parsed[0])
 
-        Example: 'B4' → 'B', 'AA10' → 'AA'.
-        """
-        return self._parsed[0]
-
-    @property
-    def row_1indexed(self) -> int:
-        """1-indexed row number for Google Sheets API.
-
-        Example: 'B4' → 4.
-        """
+    @cached_property
+    def _base_row_1indexed(self) -> int:
+        """1-indexed row number of the base cell (without offset)."""
         return self._parsed[1]
 
     @property
-    def row(self) -> int:
-        """0-indexed row number.
+    def col_letter(self) -> str:
+        """Column letter(s) after applying offset.
 
-        Example: 'B4' → 3.
+        Example: 'B4' → 'B', CellLocation('I2', offset_cols=1) → 'J'.
+        """
+        return self._col_index_to_letter(self.col)
+
+    @property
+    def row_1indexed(self) -> int:
+        """1-indexed row number for Google Sheets API after applying offset.
+
+        Example: 'B4' → 4, CellLocation('I2', offset_rows=1) → 3.
+        """
+        return self._base_row_1indexed + self.offset_rows
+
+    @property
+    def row(self) -> int:
+        """0-indexed row number after applying offset.
+
+        Example: 'B4' → 3, CellLocation('I2', offset_rows=1) → 2.
         """
         return self.row_1indexed - 1
 
     @property
     def col(self) -> int:
-        """0-indexed column number.
+        """0-indexed column number after applying offset.
 
-        Example: 'B4' → 1, 'AA10' → 26.
+        Example: 'B4' → 1, CellLocation('I2', offset_cols=1) → 9.
         """
-        return self._col_letter_to_index(self.col_letter)
+        return self._base_col_index + self.offset_cols
 
     @property
     def value(self) -> str:
-        """String representation of the cell.
+        """String representation of the cell after applying offsets.
 
-        Same as the cell attribute and __str__. Useful for API calls.
+        Useful for API calls.
 
-        Example: 'B4' → 'B4'.
+        Example: 'B4' → 'B4', CellLocation('I2', offset_cols=1) → 'J2'.
         """
-        return self.cell
+        return f'{self.col_letter}{self.row_1indexed}'
 
     def __str__(self) -> str:
-        """Return string representation of the cell."""
-        return self.cell
+        """Return string representation of the cell after applying offsets."""
+        return self.value
