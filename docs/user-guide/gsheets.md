@@ -590,6 +590,51 @@ location.row_1indexed # 10 (1-indexed)
 location.col_letter   # 'AA'
 ```
 
+#### CellRange Type
+
+`CellRange` represents a range of cells in A1 notation with computed properties:
+
+```python
+from eftoolkit.gsheets.runner import CellRange
+
+# Parse from A1 notation
+cell_range = CellRange.from_string('B4:E14')
+
+# Or create from 0-indexed bounds
+cell_range = CellRange.from_bounds(start_row=3, start_col=1, end_row=13, end_col=4)
+```
+
+| Property | Type | Description | Example (`'B4:E14'`) |
+|----------|------|-------------|----------------------|
+| `start_row` | `int` | 0-indexed start row | `3` |
+| `end_row` | `int` | 0-indexed end row | `13` |
+| `start_col` | `int` | 0-indexed start column | `1` |
+| `end_col` | `int` | 0-indexed end column | `4` |
+| `start_row_1indexed` | `int` | 1-indexed start row | `4` |
+| `end_row_1indexed` | `int` | 1-indexed end row | `14` |
+| `start_col_letter` | `str` | Start column letter(s) | `'B'` |
+| `end_col_letter` | `str` | End column letter(s) | `'E'` |
+| `num_rows` | `int` | Number of rows in range | `11` |
+| `num_cols` | `int` | Number of columns in range | `4` |
+| `is_single_cell` | `bool` | True if range is a single cell | `False` |
+
+Single cells are represented as `CellRange` where `start == end`:
+
+```python
+single = CellRange.from_string('A1')
+single.is_single_cell  # True
+single.num_rows        # 1
+single.num_cols        # 1
+str(single)            # 'A1' (not 'A1:A1')
+```
+
+Use `str()` to convert back to A1 notation for API calls:
+
+```python
+cell_range = CellRange.from_string('B4:E14')
+str(cell_range)  # 'B4:E14'
+```
+
 ### Local Preview Mode
 
 Test your dashboard without API credentials:
