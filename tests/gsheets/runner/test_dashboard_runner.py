@@ -1062,3 +1062,163 @@ def test_phase_4_applies_all_formatting_options():
         assert fmt.data_validations == [{'range': 'D1:D10', 'type': 'ONE_OF_LIST'}]
         # format_dict is passed through as the third argument
         assert call_args[0][2] == {'A1:B1': {'bold': True}}
+
+
+# --- Phase 6: Post-run hooks ---
+
+
+def test_phase_6_runs_post_hooks_with_spreadsheet():
+    """Phase 6 executes post-run hooks with Spreadsheet instance."""
+    received_spreadsheets = []
+
+    def test_hook(ss):
+        received_spreadsheets.append(ss)
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        post_run_hooks=[test_hook],
+    )
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_6_run_post_hooks()
+
+    assert len(received_spreadsheets) == 1
+    assert received_spreadsheets[0] == mock_spreadsheet
+
+
+def test_phase_6_runs_multiple_hooks_in_order():
+    """Phase 6 executes multiple post-run hooks in order."""
+    call_order = []
+
+    def hook_a(ss):
+        call_order.append('a')
+
+    def hook_b(ss):
+        call_order.append('b')
+
+    def hook_c(ss):
+        call_order.append('c')
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        post_run_hooks=[hook_a, hook_b, hook_c],
+    )
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_6_run_post_hooks()
+
+    assert call_order == ['a', 'b', 'c']
+
+
+def test_phase_6_skipped_in_local_preview_mode(caplog):
+    """Phase 6 skips post-run hooks in local_preview mode."""
+    hook_called = []
+
+    def test_hook(ss):
+        hook_called.append(True)
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        post_run_hooks=[test_hook],
+        local_preview=True,
+    )
+
+    with caplog.at_level(logging.INFO):
+        runner._phase_6_run_post_hooks()
+
+    assert hook_called == []
+    assert 'Skipping post-run hooks' in caplog.text
+
+
+def test_phase_6_no_op_with_empty_hooks():
+    """Phase 6 is a no-op when no post-run hooks are provided."""
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    # Should not raise and should not try to open Spreadsheet
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        runner._phase_6_run_post_hooks()
+        mock_ss.assert_not_called()
+
+
+def test_init_stores_post_run_hooks():
+    """DashboardRunner stores post_run_hooks from init."""
+
+    def hook(ss):
+        pass
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        post_run_hooks=[hook],
+    )
+
+    assert runner.post_run_hooks == [hook]
+
+
+def test_init_defaults_post_run_hooks_to_empty_list():
+    """DashboardRunner defaults post_run_hooks to empty list."""
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    assert runner.post_run_hooks == []
+
+
+def test_run_executes_phase_6():
+    """run() calls _phase_6_run_post_hooks."""
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        local_preview=True,
+    )
+
+    with (
+        patch.object(runner, '_phase_0_run_pre_hooks'),
+        patch.object(runner, '_phase_1_validate_structure'),
+        patch.object(runner, '_phase_2_generate_data'),
+        patch.object(runner, '_phase_3_write_data_and_run_hooks'),
+        patch.object(runner, '_phase_4_apply_formatting'),
+        patch.object(runner, '_phase_5_log_summary'),
+        patch.object(runner, '_phase_6_run_post_hooks') as p6,
+    ):
+        runner.run()
+
+        p6.assert_called_once()
