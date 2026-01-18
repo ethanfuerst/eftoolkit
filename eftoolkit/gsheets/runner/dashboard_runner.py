@@ -1,4 +1,4 @@
-"""DashboardRunner: 6-phase workflow orchestrator.
+"""DashboardRunner: 7-phase workflow orchestrator.
 
 Orchestrates the complete workflow for updating Google Sheets dashboards:
 
@@ -8,6 +8,7 @@ Orchestrates the complete workflow for updating Google Sheets dashboards:
 3. Write all DataFrames to worksheets and run post-write hooks (I/O phase)
 4. Apply formatting (formatting phase)
 5. Log summary
+6. Run post-run hooks (optional cleanup/finalization operations)
 
 Example usage:
     from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
@@ -49,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 
 class DashboardRunner:
-    """Orchestrates the 6-phase sheet update workflow.
+    """Orchestrates the 7-phase sheet update workflow.
 
     Executes worksheet generation, writing, and formatting in a structured
     sequence with logging and error handling.
@@ -59,6 +60,8 @@ class DashboardRunner:
         credentials: Google service account credentials dictionary.
         pre_run_hooks: List of callables that receive a Spreadsheet instance
             and run before the main workflow for setup operations.
+        post_run_hooks: List of callables that receive a Spreadsheet instance
+            and run after the main workflow for cleanup/finalization operations.
         context: Shared state dictionary populated during generation and available
             to subsequent worksheets.
         results: Dictionary mapping worksheet names to their generated assets.
@@ -71,7 +74,7 @@ class DashboardRunner:
         ...     config={'sheet_name': 'My Report'},
         ...     credentials=credentials,
         ...     worksheets=[SummaryWorksheet(), DetailsWorksheet()],
-        ...     pre_run_hooks=[reorder_tabs],
+        ...     post_run_hooks=[reorder_tabs],
         ... )
         >>> runner.run()
     """
@@ -83,6 +86,7 @@ class DashboardRunner:
         worksheets: list[WorksheetDefinition] | None = None,
         *,
         pre_run_hooks: list[Callable[[SpreadsheetType], None]] | None = None,
+        post_run_hooks: list[Callable[[SpreadsheetType], None]] | None = None,
         local_preview: bool = False,
     ) -> None:
         """Initialize DashboardRunner.
@@ -97,6 +101,10 @@ class DashboardRunner:
                 Run before the main workflow for setup operations like creating
                 worksheets, deleting worksheets, or reordering tabs.
                 Skipped in local_preview mode.
+            post_run_hooks: List of callables that receive a Spreadsheet instance.
+                Run after the main workflow for cleanup/finalization operations
+                like reordering tabs or sending notifications.
+                Skipped in local_preview mode.
             local_preview: If True, render to local HTML instead of Google Sheets.
 
         Raises:
@@ -109,6 +117,7 @@ class DashboardRunner:
         self.config = config
         self.credentials = credentials
         self.pre_run_hooks = pre_run_hooks or []
+        self.post_run_hooks = post_run_hooks or []
         self.local_preview = local_preview
 
         if worksheets is not None:
@@ -125,7 +134,7 @@ class DashboardRunner:
         self.results: dict[str, list[WorksheetAsset]] = {}
 
     def run(self) -> None:
-        """Execute the full 6-phase workflow.
+        """Execute the full 7-phase workflow.
 
         Phases:
             0. Run pre-run hooks (optional setup)
@@ -134,6 +143,7 @@ class DashboardRunner:
             3. Write data and run hooks
             4. Apply formatting
             5. Log summary
+            6. Run post-run hooks (optional cleanup/finalization)
 
         Raises:
             Exception: Re-raises any exception from individual phases.
@@ -146,6 +156,7 @@ class DashboardRunner:
         self._phase_3_write_data_and_run_hooks()
         self._phase_4_apply_formatting()
         self._phase_5_log_summary()
+        self._phase_6_run_post_hooks()
 
         logger.info('Dashboard run complete')
 
@@ -349,3 +360,28 @@ class DashboardRunner:
             total_assets,
             total_rows,
         )
+
+    def _phase_6_run_post_hooks(self) -> None:
+        """Phase 6: Run post-run hooks for cleanup/finalization operations.
+
+        Executes post-run hooks with an open Spreadsheet context,
+        allowing operations like reordering tabs, sending notifications,
+        or other cleanup tasks after the main workflow completes.
+
+        Skipped if no post-run hooks provided or in local_preview mode.
+        """
+        if not self.post_run_hooks:
+            return
+
+        if self.local_preview:
+            logger.info('Phase 6: Skipping post-run hooks (local_preview mode)')
+            return
+
+        logger.info('Phase 6: Running post-run hooks')
+        with Spreadsheet(
+            credentials=self.credentials,
+            spreadsheet_name=self.config['sheet_name'],
+        ) as ss:
+            for hook in self.post_run_hooks:
+                hook(ss)
+        logger.info('  Executed %d post-run hooks', len(self.post_run_hooks))
