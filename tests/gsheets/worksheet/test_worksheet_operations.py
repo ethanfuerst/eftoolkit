@@ -3,6 +3,7 @@
 import pandas as pd
 
 from eftoolkit.gsheets import Spreadsheet
+from eftoolkit.gsheets.types import CellLocation, CellRange
 
 # --- Write Operations ---
 
@@ -42,6 +43,18 @@ def test_worksheet_write_dataframe_with_format():
     assert ws._batch_requests[0]['type'] == 'format'
 
 
+def test_worksheet_write_dataframe_with_cell_location():
+    """write_dataframe accepts CellLocation for location parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    df = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
+    ws.write_dataframe(df, location=CellLocation(cell='B3'))
+
+    assert len(ws._value_updates) == 1
+    assert 'B3' in ws._value_updates[0]['range']
+
+
 def test_worksheet_write_values_queues():
     """write_values adds to value_updates queue."""
     ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
@@ -72,6 +85,28 @@ def test_worksheet_write_values_keeps_existing_title():
     assert ws._value_updates[0]['range'] == 'OtherSheet!A1:B2'
 
 
+def test_worksheet_write_values_with_cell_location():
+    """write_values accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.write_values(CellLocation(cell='C5'), [[1, 2]])
+
+    assert len(ws._value_updates) == 1
+    assert 'C5' in ws._value_updates[0]['range']
+
+
+def test_worksheet_write_values_with_cell_range():
+    """write_values accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.write_values(CellRange.from_string('A1:B2'), [[1, 2], [3, 4]])
+
+    assert len(ws._value_updates) == 1
+    assert 'A1:B2' in ws._value_updates[0]['range']
+
+
 # --- Format Operations ---
 
 
@@ -84,6 +119,30 @@ def test_worksheet_format_range_queues():
 
     assert len(ws._batch_requests) == 1
     assert ws._batch_requests[0]['type'] == 'format'
+
+
+def test_worksheet_format_range_with_cell_location():
+    """format_range accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.format_range(CellLocation(cell='D7'), {'bold': True})
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'format'
+    assert ws._batch_requests[0]['range'] == CellLocation(cell='D7')
+
+
+def test_worksheet_format_range_with_cell_range():
+    """format_range accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.format_range(CellRange.from_string('B2:D4'), {'bold': True})
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'format'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('B2:D4')
 
 
 def test_worksheet_set_borders_queues():
