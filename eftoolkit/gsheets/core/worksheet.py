@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from eftoolkit.gsheets.types import CellLocation, CellRange, RangeType
+from eftoolkit.gsheets.types import CellLocation, CellRange, CellType, RangeType
 from eftoolkit.gsheets.utils import (
     BATCH_HANDLERS,
     batch_handler,
@@ -87,28 +87,32 @@ class Worksheet:
             return pd.DataFrame()
         return pd.DataFrame(data=all_values[1:], columns=all_values[0])
 
-    def read_cell(self, cell: str) -> Any:
+    def read_cell(self, cell: CellType) -> Any:
         """Read value of a single cell.
 
         Args:
-            cell: A1 notation cell reference (e.g., 'V5', 'AA10').
+            cell: A1 notation cell reference or CellLocation
+                (e.g., 'V5', CellLocation(cell='V5')).
 
         Returns:
             The cell's value (string, number, or empty string if blank).
 
         Example:
             value = ws.read_cell('V5')
+            value = ws.read_cell(CellLocation(cell='V5'))
         """
         if self._local_preview:
             raise NotImplementedError('read_cell not available in local preview mode')
 
-        return self._ws.acell(cell).value
+        cell_loc = self._to_cell_location(cell)
+        return self._ws.acell(cell_loc.value).value
 
-    def read_range(self, range_name: str) -> list[list[Any]]:
+    def read_range(self, range_name: RangeType) -> list[list[Any]]:
         """Read values from a cell range.
 
         Args:
-            range_name: A1 notation range (e.g., 'V5:V10', 'A1:C3').
+            range_name: A1 notation range, CellLocation, or CellRange
+                (e.g., 'V5:V10', CellRange.from_string('V5:V10')).
 
         Returns:
             2D list of values (list of rows, each row is a list of cell values).
@@ -116,17 +120,18 @@ class Worksheet:
 
         Example:
             values = ws.read_range('V5:V10')
-            # Returns: [['value1'], ['value2'], ...]
+            values = ws.read_range(CellRange.from_string('V5:V10'))
         """
         if self._local_preview:
             raise NotImplementedError('read_range not available in local preview mode')
 
-        return self._ws.get(range_name)
+        range_obj = self._to_range(range_name)
+        return self._ws.get(range_obj.value)
 
     def write_dataframe(
         self,
         df: pd.DataFrame,
-        location: str = 'A1',
+        location: CellType | None = None,
         *,
         include_header: bool = True,
         format_dict: dict[str, Any] | None = None,
@@ -135,7 +140,8 @@ class Worksheet:
 
         Args:
             df: DataFrame to write.
-            location: Cell location to start writing (e.g., 'A1').
+            location: Cell location to start writing (e.g., 'A1', CellLocation(cell='A1')).
+                Defaults to CellLocation(cell='A1').
             include_header: If True, include column names as first row.
             format_dict: Optional dict mapping range names to format dicts.
         """
@@ -143,9 +149,12 @@ class Worksheet:
         if include_header:
             values = [df.columns.tolist()] + values
 
+        if location is None:
+            location = CellLocation(cell='A1')
+        location_obj = self._to_cell_location(location)
         self._value_updates.append(
             {
-                'range': f'{self.title}!{location}',
+                'range': f'{self.title}!{location_obj.value}',
                 'values': values,
             }
         )
@@ -162,19 +171,22 @@ class Worksheet:
 
     def write_values(
         self,
-        range_name: str,
+        range_name: RangeType,
         values: list[list[Any]],
     ) -> None:
         """Queue cell values update.
 
         Args:
-            range_name: A1 notation range (e.g., 'A1:B2').
+            range_name: A1 notation range, CellLocation, or CellRange
+                (e.g., 'A1:B2', CellRange.from_string('A1:B2')).
             values: 2D list of values to write.
         """
+        range_obj = self._to_range(range_name)
+        range_str = range_obj.value
         # Prepend worksheet name if not already included
-        if '!' not in range_name:
-            range_name = f'{self.title}!{range_name}'
-        self._value_updates.append({'range': range_name, 'values': values})
+        if '!' not in range_str:
+            range_str = f'{self.title}!{range_str}'
+        self._value_updates.append({'range': range_str, 'values': values})
 
     def format_range(
         self,
@@ -561,6 +573,37 @@ class Worksheet:
 
         self._value_updates.clear()
         self._batch_requests.clear()
+
+    @staticmethod
+    def _to_cell_location(cell: CellType) -> CellLocation:
+        """Convert string to CellLocation, or return as-is if already CellLocation.
+
+        Args:
+            cell: A1 notation cell reference or CellLocation.
+
+        Returns:
+            CellLocation instance.
+        """
+        if isinstance(cell, CellLocation):
+            return cell
+        return CellLocation(cell=cell)
+
+    @staticmethod
+    def _to_range(range_value: RangeType) -> CellLocation | CellRange:
+        """Convert string to CellLocation/CellRange, or return as-is if already typed.
+
+        Args:
+            range_value: A1 notation range, CellLocation, or CellRange.
+
+        Returns:
+            CellLocation (for single cells) or CellRange (for ranges).
+        """
+        if isinstance(range_value, CellLocation | CellRange):
+            return range_value
+        # Check if it's a range (contains ':') or single cell
+        if ':' in range_value:
+            return CellRange.from_string(range_value)
+        return CellLocation(cell=range_value)
 
     @staticmethod
     def _resolve_range(range_value: RangeType) -> str:
