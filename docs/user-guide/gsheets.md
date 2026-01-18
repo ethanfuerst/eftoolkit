@@ -530,23 +530,43 @@ The `HookContext` provides:
 | `worksheet_name` | `str` | Name of the worksheet definition |
 | `runner_context` | `dict` | Shared context dictionary from the DashboardRunner |
 
-Example using all context attributes:
+#### WorksheetAsset Computed Ranges
+
+`WorksheetAsset` provides computed properties for easy access to cell ranges, eliminating the need to manually calculate ranges based on location and DataFrame dimensions:
+
+| Property | Type | Description | Example |
+|----------|------|-------------|---------|
+| `header_range` | `str` | A1-notation range for the header row | `'B4:E4'` |
+| `data_range` | `str` | A1-notation range for data rows (excluding header) | `'B5:E14'` |
+| `full_range` | `str` | A1-notation range for header + data | `'B4:E14'` |
+| `column_ranges` | `dict[str, str]` | Column name → full column range (including header) | `{'Name': 'B4:B14'}` |
+| `data_column_ranges` | `dict[str, str]` | Column name → data-only range (excluding header) | `{'Name': 'B5:B14'}` |
+| `num_rows` | `int` | Number of data rows (excluding header) | `10` |
+| `num_cols` | `int` | Number of columns | `4` |
+| `start_row` | `int` | 1-based row index of header row | `4` |
+| `end_row` | `int` | 1-based row index of last data row | `14` |
+| `start_col` | `str` | Letter of first column | `'B'` |
+| `end_col` | `str` | Letter of last column | `'E'` |
+
+Example using computed ranges in hooks:
 
 ```python
-def advanced_hook(ctx: HookContext) -> None:
-    # Access the worksheet for formatting
-    num_rows = len(ctx.asset.df)
-    data_range = f'A1:B{num_rows + 1}'  # +1 for header
-    ctx.worksheet.format_range(data_range, {'textFormat': {'fontSize': 10}})
+def format_header(ctx: HookContext) -> None:
+    """Bold the header row using computed range."""
+    ctx.worksheet.format_range(ctx.asset.header_range, {'textFormat': {'bold': True}})
 
-    # Access data from other worksheets via runner_context
-    if 'Revenue' in ctx.runner_context:
-        revenue_rows = ctx.runner_context['Revenue']['total_rows']
-        print(f'Revenue sheet has {revenue_rows} rows')
+def format_currency_column(ctx: HookContext) -> None:
+    """Apply currency format to the Amount column."""
+    amount_range = ctx.asset.data_column_ranges['Amount']
+    ctx.worksheet.format_range(amount_range, {
+        'numberFormat': {'type': 'CURRENCY', 'pattern': '$#,##0.00'}
+    })
 
-    # Access the asset's data
-    if ctx.asset.df['Value'].max() > 100:
-        ctx.worksheet.set_notes({'A1': 'Contains high values!'})
+def highlight_data_area(ctx: HookContext) -> None:
+    """Add background color to all data rows."""
+    ctx.worksheet.format_range(ctx.asset.data_range, {
+        'backgroundColor': {'red': 0.95, 'green': 0.95, 'blue': 0.95}
+    })
 ```
 
 ### Local Preview Mode
