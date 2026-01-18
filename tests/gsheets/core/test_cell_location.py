@@ -161,3 +161,27 @@ def test_properties_with_lowercase_cell():
     assert location.col == 1
     assert location.row_1indexed == 4
     assert location.col_letter == 'b'
+
+
+# value and __str__ tests
+
+
+def test_value_returns_cell_string():
+    """value property returns the cell string."""
+    location = CellLocation(cell='B4')
+
+    assert location.value == 'B4'
+
+
+def test_str_returns_cell_string():
+    """__str__ returns the cell string."""
+    location = CellLocation(cell='B4')
+
+    assert str(location) == 'B4'
+
+
+def test_value_equals_str():
+    """value property equals __str__."""
+    location = CellLocation(cell='AA10')
+
+    assert location.value == str(location)

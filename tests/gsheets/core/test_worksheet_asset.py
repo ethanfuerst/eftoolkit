@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from eftoolkit.gsheets.runner import CellLocation, WorksheetAsset
+from eftoolkit.gsheets.runner import CellLocation, CellRange, WorksheetAsset
 
 
 def test_create_minimal():
@@ -74,55 +74,54 @@ def test_start_and_end_col():
 
 
 def test_header_range():
-    """header_range returns the A1-notation range for the header row."""
+    """header_range returns a CellRange for the header row."""
     df = pd.DataFrame({'Name': ['Alice'], 'Score': [95], 'Grade': ['A']})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
 
-    assert asset.header_range == 'B4:D4'
+    assert isinstance(asset.header_range, CellRange)
+    assert asset.header_range.value == 'B4:D4'
 
 
 def test_data_range():
-    """data_range returns the A1-notation range for data rows (excluding header)."""
+    """data_range returns a CellRange for data rows (excluding header)."""
     df = pd.DataFrame({'Name': ['Alice', 'Bob'], 'Score': [95, 87]})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
 
     # Header at B4, data at B5:C6
-    assert asset.data_range == 'B5:C6'
+    assert isinstance(asset.data_range, CellRange)
+    assert asset.data_range.value == 'B5:C6'
 
 
 def test_full_range():
-    """full_range returns the A1-notation range for header + data."""
+    """full_range returns a CellRange for header + data."""
     df = pd.DataFrame({'Name': ['Alice', 'Bob'], 'Score': [95, 87]})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
 
     # Header at B4, data at B5:C6, full range B4:C6
-    assert asset.full_range == 'B4:C6'
+    assert isinstance(asset.full_range, CellRange)
+    assert asset.full_range.value == 'B4:C6'
 
 
 def test_column_ranges():
-    """column_ranges maps column names to full column ranges."""
+    """column_ranges maps column names to CellRange objects."""
     df = pd.DataFrame({'Name': ['Alice', 'Bob'], 'Score': [95, 87]})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
 
-    expected = {
-        'Name': 'B4:B6',  # Header + 2 data rows
-        'Score': 'C4:C6',
-    }
-
-    assert asset.column_ranges == expected
+    assert isinstance(asset.column_ranges['Name'], CellRange)
+    assert isinstance(asset.column_ranges['Score'], CellRange)
+    assert asset.column_ranges['Name'].value == 'B4:B6'  # Header + 2 data rows
+    assert asset.column_ranges['Score'].value == 'C4:C6'
 
 
 def test_data_column_ranges():
-    """data_column_ranges maps column names to data-only column ranges."""
+    """data_column_ranges maps column names to data-only CellRange objects."""
     df = pd.DataFrame({'Name': ['Alice', 'Bob'], 'Score': [95, 87]})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
 
-    expected = {
-        'Name': 'B5:B6',  # Data only, no header
-        'Score': 'C5:C6',
-    }
-
-    assert asset.data_column_ranges == expected
+    assert isinstance(asset.data_column_ranges['Name'], CellRange)
+    assert isinstance(asset.data_column_ranges['Score'], CellRange)
+    assert asset.data_column_ranges['Name'].value == 'B5:B6'  # Data only, no header
+    assert asset.data_column_ranges['Score'].value == 'C5:C6'
 
 
 def test_ranges_with_a1_location():
@@ -130,11 +129,13 @@ def test_ranges_with_a1_location():
     df = pd.DataFrame({'X': [1, 2, 3]})
     asset = WorksheetAsset(df=df, location=CellLocation(cell='A1'))
 
-    assert asset.header_range == 'A1:A1'
-    assert asset.data_range == 'A2:A4'
-    assert asset.full_range == 'A1:A4'
-    assert asset.column_ranges == {'X': 'A1:A4'}
-    assert asset.data_column_ranges == {'X': 'A2:A4'}
+    # Single-column header is a single cell, so CellRange returns 'A1' not 'A1:A1'
+    assert asset.header_range.value == 'A1'
+    assert asset.header_range.is_single_cell
+    assert asset.data_range.value == 'A2:A4'
+    assert asset.full_range.value == 'A1:A4'
+    assert asset.column_ranges['X'].value == 'A1:A4'
+    assert asset.data_column_ranges['X'].value == 'A2:A4'
 
 
 def test_ranges_with_double_letter_columns():
@@ -147,7 +148,7 @@ def test_ranges_with_double_letter_columns():
     # 30 columns starting at A goes to AD (A-Z is 26, then AA, AB, AC, AD)
     assert asset.start_col == 'A'
     assert asset.end_col == 'AD'
-    assert asset.header_range == 'A1:AD1'
+    assert asset.header_range.value == 'A1:AD1'
 
 
 def test_ranges_with_empty_dataframe():
@@ -159,8 +160,22 @@ def test_ranges_with_empty_dataframe():
     assert asset.num_cols == 2
     assert asset.start_row == 4
     assert asset.end_row == 4  # Header only, no data
-    assert asset.header_range == 'B4:C4'
-    assert asset.full_range == 'B4:C4'
+    assert asset.header_range.value == 'B4:C4'
+    assert asset.full_range.value == 'B4:C4'
+
+
+def test_range_properties_provide_computed_values():
+    """Range properties provide access to CellRange computed values."""
+    df = pd.DataFrame({'Name': ['Alice', 'Bob'], 'Score': [95, 87]})
+    asset = WorksheetAsset(df=df, location=CellLocation(cell='B4'))
+
+    # Test that CellRange properties are accessible
+    assert asset.full_range.start_row == 3  # 0-indexed
+    assert asset.full_range.end_row == 5  # 0-indexed
+    assert asset.full_range.start_col == 1  # 0-indexed (B=1)
+    assert asset.full_range.end_col == 2  # 0-indexed (C=2)
+    assert asset.full_range.num_rows == 3  # Header + 2 data rows
+    assert asset.full_range.num_cols == 2
 
 
 def test_hash_based_on_location():

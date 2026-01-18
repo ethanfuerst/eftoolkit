@@ -19,6 +19,7 @@ class CellLocation:
         col: 0-indexed column number (e.g., 'B4' → 1).
         row_1indexed: 1-indexed row number for Google Sheets API (e.g., 'B4' → 4).
         col_letter: Column letter(s) (e.g., 'B4' → 'B', 'AA1' → 'AA').
+        value: String representation of the cell (same as cell attribute).
 
     Example:
         >>> location = CellLocation(cell='B4')
@@ -101,3 +102,17 @@ class CellLocation:
         Example: 'B4' → 1, 'AA10' → 26.
         """
         return self._col_letter_to_index(self.col_letter)
+
+    @property
+    def value(self) -> str:
+        """String representation of the cell.
+
+        Same as the cell attribute and __str__. Useful for API calls.
+
+        Example: 'B4' → 'B4'.
+        """
+        return self.cell
+
+    def __str__(self) -> str:
+        """Return string representation of the cell."""
+        return self.cell

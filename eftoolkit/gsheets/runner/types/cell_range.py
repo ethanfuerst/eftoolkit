@@ -32,6 +32,7 @@ class CellRange:
         num_rows: Number of rows in the range.
         num_cols: Number of columns in the range.
         is_single_cell: True if range is a single cell.
+        value: A1 notation string representation of the range.
 
     Example:
         >>> cell_range = CellRange.from_string('B4:E14')
@@ -162,11 +163,21 @@ class CellRange:
         """True if range is a single cell."""
         return self.start == self.end
 
-    def __str__(self) -> str:
-        """Return A1 notation string.
+    @property
+    def value(self) -> str:
+        """A1 notation string representation of the range.
+
+        Same as __str__. Useful for API calls.
 
         Returns 'A1' for single cells, 'B4:E14' for multi-cell ranges.
         """
         if self.is_single_cell:
             return self.start.cell
         return f'{self.start.cell}:{self.end.cell}'
+
+    def __str__(self) -> str:
+        """Return A1 notation string.
+
+        Returns 'A1' for single cells, 'B4:E14' for multi-cell ranges.
+        """
+        return self.value

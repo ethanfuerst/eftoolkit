@@ -296,3 +296,27 @@ def test_properties_with_large_range():
     assert cell_range.end_col == 702
     assert cell_range.num_rows == 901
     assert cell_range.num_cols == 678
+
+
+# value property tests
+
+
+def test_value_multi_cell_range():
+    """value property returns A1 notation for multi-cell range."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert cell_range.value == 'B4:E14'
+
+
+def test_value_single_cell():
+    """value property returns single cell notation (not 'A1:A1')."""
+    cell_range = CellRange.from_string('A1')
+
+    assert cell_range.value == 'A1'
+
+
+def test_value_equals_str():
+    """value property equals __str__."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert cell_range.value == str(cell_range)
