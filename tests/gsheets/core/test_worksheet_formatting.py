@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from eftoolkit.gsheets.runner import WorksheetFormatting
+from eftoolkit.gsheets.types import CellLocation, CellRange
 
 
 def test_create_empty():
@@ -62,15 +63,57 @@ def test_create_with_format_dict():
 
 
 def test_create_with_merge_ranges():
-    """WorksheetFormatting with merge_ranges."""
+    """WorksheetFormatting with merge_ranges as strings."""
     formatting = WorksheetFormatting(merge_ranges=['A1:C1', 'B5:D5'])
 
     assert formatting.merge_ranges == ['A1:C1', 'B5:D5']
 
 
+def test_create_with_merge_ranges_cell_range():
+    """WorksheetFormatting with merge_ranges as CellRange objects."""
+    range1 = CellRange.from_string('A1:C1')
+    range2 = CellRange.from_string('B5:D5')
+
+    formatting = WorksheetFormatting(merge_ranges=[range1, range2])
+
+    assert formatting.merge_ranges == [range1, range2]
+    assert formatting.merge_ranges[0].value == 'A1:C1'
+
+
+def test_create_with_merge_ranges_mixed():
+    """WorksheetFormatting with merge_ranges mixing strings and CellRange."""
+    range_obj = CellRange.from_string('B5:D5')
+
+    formatting = WorksheetFormatting(merge_ranges=['A1:C1', range_obj])
+
+    assert formatting.merge_ranges == ['A1:C1', range_obj]
+
+
 def test_create_with_notes():
-    """WorksheetFormatting with notes."""
+    """WorksheetFormatting with notes as string keys."""
     notes = {'A1': 'Header note', 'B2': 'Data note'}
+
+    formatting = WorksheetFormatting(notes=notes)
+
+    assert formatting.notes == notes
+
+
+def test_create_with_notes_cell_location():
+    """WorksheetFormatting with notes using CellLocation keys."""
+    cell1 = CellLocation(cell='A1')
+    cell2 = CellLocation(cell='B2')
+    notes = {cell1: 'Header note', cell2: 'Data note'}
+
+    formatting = WorksheetFormatting(notes=notes)
+
+    assert formatting.notes == notes
+    assert formatting.notes[cell1] == 'Header note'
+
+
+def test_create_with_notes_mixed():
+    """WorksheetFormatting with notes mixing string and CellLocation keys."""
+    cell_loc = CellLocation(cell='B2')
+    notes = {'A1': 'Header note', cell_loc: 'Data note'}
 
     formatting = WorksheetFormatting(notes=notes)
 
@@ -84,6 +127,17 @@ def test_create_with_column_widths():
     formatting = WorksheetFormatting(column_widths=column_widths)
 
     assert formatting.column_widths == column_widths
+
+
+def test_create_with_borders_cell_range():
+    """WorksheetFormatting with borders using CellRange keys."""
+    range_obj = CellRange.from_string('A1:C10')
+    borders = {range_obj: {'style': 'solid'}}
+
+    formatting = WorksheetFormatting(borders=borders)
+
+    assert formatting.borders == borders
+    assert formatting.borders[range_obj] == {'style': 'solid'}
 
 
 def test_create_with_all_options():
@@ -113,6 +167,31 @@ def test_create_with_all_options():
     assert formatting.auto_resize_columns == (0, 5)
     assert formatting.format_config_path == Path('formats/base.json')
     assert formatting.format_dict == {'header_color': '#4a86e8'}
+
+
+def test_create_with_all_options_typed():
+    """WorksheetFormatting with all options set using typed objects."""
+    merge_range = CellRange.from_string('A1:C1')
+    note_cell = CellLocation(cell='A1')
+    border_range = CellRange.from_string('A1:C10')
+
+    formatting = WorksheetFormatting(
+        merge_ranges=[merge_range],
+        conditional_formats=[{'range': 'B2:B10', 'rule': 'positive'}],
+        notes={note_cell: 'Note'},
+        column_widths={'A': 100},
+        borders={border_range: {'style': 'solid'}},
+        data_validations=[{'range': 'D1:D10', 'type': 'list'}],
+        freeze_rows=1,
+        freeze_columns=1,
+        auto_resize_columns=(0, 5),
+        format_config_path=Path('formats/base.json'),
+        format_dict={'header_color': '#4a86e8'},
+    )
+
+    assert formatting.merge_ranges == [merge_range]
+    assert formatting.notes == {note_cell: 'Note'}
+    assert formatting.borders == {border_range: {'style': 'solid'}}
 
 
 def test_mutable_defaults_isolated():
