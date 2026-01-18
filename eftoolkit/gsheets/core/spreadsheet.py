@@ -7,12 +7,15 @@ import random
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from gspread import service_account_from_dict
 from gspread.exceptions import APIError, WorksheetNotFound
 
 from eftoolkit.gsheets.core.worksheet import Worksheet
+
+if TYPE_CHECKING:
+    from eftoolkit.gsheets.runner.types import WorksheetFormatting
 
 T = TypeVar('T')
 
@@ -276,3 +279,94 @@ class Spreadsheet:
             lambda: self._gspread_spreadsheet.reorder_worksheets(ordered),
             'reorder_worksheets',
         )
+
+    def apply_formatting(
+        self,
+        worksheet_name: str,
+        formatting: WorksheetFormatting,
+        format_dict: dict[str, Any] | None = None,
+    ) -> None:
+        """Apply WorksheetFormatting to a worksheet.
+
+        Queues all formatting operations specified in the WorksheetFormatting object.
+        Operations are batched and sent when the Spreadsheet context exits or when
+        the worksheet's flush() method is called.
+
+        Args:
+            worksheet_name: Name of the worksheet to apply formatting to.
+            formatting: WorksheetFormatting instance with formatting settings.
+            format_dict: Optional pre-merged format dict (if format_config_path and
+                format_dict have already been merged). If None, only formatting.format_dict
+                is used.
+
+        Example:
+            >>> from eftoolkit.gsheets.runner import WorksheetFormatting
+            >>> with Spreadsheet(credentials, 'My Sheet') as ss:
+            ...     ss.create_worksheet('Report', replace=True)
+            ...     # ... write data ...
+            ...     formatting = WorksheetFormatting(
+            ...         freeze_rows=1,
+            ...         auto_resize_columns=(0, 5),
+            ...         notes={'A1': 'Header'},
+            ...     )
+            ...     ss.apply_formatting('Report', formatting)
+            # All formatting applied on context exit
+        """
+        ws = self.worksheet(worksheet_name)
+
+        # Apply freeze rows
+        if formatting.freeze_rows is not None:
+            ws.freeze_rows(formatting.freeze_rows)
+
+        # Apply freeze columns
+        if formatting.freeze_columns is not None:
+            ws.freeze_columns(formatting.freeze_columns)
+
+        # Apply auto-resize columns
+        if formatting.auto_resize_columns is not None:
+            start_col, end_col = formatting.auto_resize_columns
+            ws.auto_resize_columns(start_col, end_col)
+
+        # Apply merge ranges
+        for merge_range in formatting.merge_ranges:
+            ws.merge_cells(merge_range)
+
+        # Apply notes
+        if formatting.notes:
+            # Convert CellType keys to strings for the API
+            notes_dict = {}
+            for cell, note in formatting.notes.items():
+                cell_str = cell.value if hasattr(cell, 'value') else cell
+                notes_dict[cell_str] = note
+            ws.set_notes(notes_dict)
+
+        # Apply column widths
+        for column, width in formatting.column_widths.items():
+            ws.set_column_width(column, width)
+
+        # Apply borders
+        for range_key, border_config in formatting.borders.items():
+            ws.set_borders(range_key, border_config)
+
+        # Apply conditional formats
+        for cf_rule in formatting.conditional_formats:
+            # conditional_formats contains dicts with 'range' and other fields
+            range_str = cf_rule.get('range', '')
+            rule = {k: v for k, v in cf_rule.items() if k != 'range'}
+            ws.add_conditional_format(range_str, rule)
+
+        # Apply data validations
+        for dv_rule in formatting.data_validations:
+            # data_validations contains dicts with 'range' and other fields
+            range_str = dv_rule.get('range', '')
+            rule = {k: v for k, v in dv_rule.items() if k != 'range'}
+            ws.set_data_validation(range_str, rule)
+
+        # Apply format_dict (cell formatting)
+        # Use provided format_dict (pre-merged) or fall back to formatting.format_dict
+        effective_format_dict = (
+            format_dict if format_dict is not None else formatting.format_dict
+        )
+        if effective_format_dict:
+            for range_name, fmt in effective_format_dict.items():
+                ws.format_range(range_name, fmt)
