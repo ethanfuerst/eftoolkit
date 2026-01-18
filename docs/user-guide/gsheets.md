@@ -569,6 +569,27 @@ def highlight_data_area(ctx: HookContext) -> None:
     })
 ```
 
+#### CellLocation Properties
+
+`CellLocation` provides computed properties for easy access to row and column indices without manual parsing:
+
+| Property | Type | Description | Example (`'B4'`) |
+|----------|------|-------------|------------------|
+| `row` | `int` | 0-indexed row number | `3` |
+| `col` | `int` | 0-indexed column number | `1` |
+| `row_1indexed` | `int` | 1-indexed row number (for Google Sheets API) | `4` |
+| `col_letter` | `str` | Column letter(s) | `'B'` |
+
+Example usage:
+
+```python
+location = CellLocation(cell='AA10')
+location.row          # 9 (0-indexed)
+location.col          # 26 (0-indexed, AA = 26)
+location.row_1indexed # 10 (1-indexed)
+location.col_letter   # 'AA'
+```
+
 ### Local Preview Mode
 
 Test your dashboard without API credentials:

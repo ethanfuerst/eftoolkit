@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from eftoolkit.gsheets.utils import BATCH_HANDLERS, batch_handler, parse_cell_reference
+from eftoolkit.gsheets.utils import (
+    BATCH_HANDLERS,
+    batch_handler,
+    column_index_to_letter,
+    parse_cell_reference,
+)
 
 if TYPE_CHECKING:
     from eftoolkit.gsheets.core.spreadsheet import Spreadsheet
@@ -1084,15 +1089,6 @@ class Worksheet:
                     max_row = max(max_row, r)
                     max_col = max(max_col, c)
 
-        # Generate column headers (A, B, C, ... AA, AB, etc.)
-        def col_to_letter(col_idx: int) -> str:
-            result = ''
-            col_idx += 1  # Convert to 1-indexed
-            while col_idx > 0:
-                col_idx, remainder = divmod(col_idx - 1, 26)
-                result = chr(ord('A') + remainder) + result
-            return result
-
         # Build HTML with Google Sheets-like styling
         html = ['<!DOCTYPE html><html><head>']
         html.append('<meta charset="utf-8">')
@@ -1153,7 +1149,7 @@ class Worksheet:
             width = self._preview_column_widths.get(c, 80)
             html.append(
                 f'<th style="width: {width}px; min-width: {width}px;">'
-                f'{col_to_letter(c)}</th>'
+                f'{column_index_to_letter(c)}</th>'
             )
         html.append('</tr>')
 
