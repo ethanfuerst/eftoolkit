@@ -27,6 +27,12 @@ jobs:
         run: |
           uv run cz check --rev-range origin/${{ github.base_ref }}..HEAD
 
+      - name: Check PR title severity matches commits
+        run: |
+          python scripts/check_pr_severity.py \
+            --pr-title "${{ github.event.pull_request.title }}" \
+            --base-ref "origin/${{ github.base_ref }}"
+
   lint:
     runs-on: ubuntu-latest
     steps:
