@@ -320,3 +320,89 @@ def test_value_equals_str():
     cell_range = CellRange.from_string('B4:E14')
 
     assert cell_range.value == str(cell_range)
+
+
+# __contains__ tests
+
+
+def test_contains_cell_inside_range():
+    """Cell inside range returns True."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='C5') in cell_range
+
+
+def test_contains_cell_at_start():
+    """Cell at start corner of range returns True."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='B4') in cell_range
+
+
+def test_contains_cell_at_end():
+    """Cell at end corner of range returns True."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='E14') in cell_range
+
+
+def test_contains_cell_at_top_right():
+    """Cell at top-right corner of range returns True."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='E4') in cell_range
+
+
+def test_contains_cell_at_bottom_left():
+    """Cell at bottom-left corner of range returns True."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='B14') in cell_range
+
+
+def test_contains_cell_outside_left():
+    """Cell outside range (left) returns False."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='A5') not in cell_range
+
+
+def test_contains_cell_outside_right():
+    """Cell outside range (right) returns False."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='F5') not in cell_range
+
+
+def test_contains_cell_outside_above():
+    """Cell outside range (above) returns False."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='C3') not in cell_range
+
+
+def test_contains_cell_outside_below():
+    """Cell outside range (below) returns False."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert CellLocation(cell='C15') not in cell_range
+
+
+def test_contains_single_cell_range():
+    """Single cell range contains only itself."""
+    cell_range = CellRange.from_string('B4')
+
+    assert CellLocation(cell='B4') in cell_range
+    assert CellLocation(cell='A4') not in cell_range
+    assert CellLocation(cell='C4') not in cell_range
+    assert CellLocation(cell='B3') not in cell_range
+    assert CellLocation(cell='B5') not in cell_range
+
+
+def test_contains_with_double_letter_columns():
+    """Contains works with double-letter columns."""
+    cell_range = CellRange.from_string('AA1:AD10')
+
+    assert CellLocation(cell='AB5') in cell_range
+    assert CellLocation(cell='Z5') not in cell_range
+    assert CellLocation(cell='AE5') not in cell_range

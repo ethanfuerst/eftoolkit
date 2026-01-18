@@ -646,6 +646,18 @@ cell_range.value  # 'B4:E14'
 str(cell_range)   # 'B4:E14'
 ```
 
+Check if a cell is within a range using the `in` operator:
+
+```python
+from eftoolkit.gsheets.runner import CellLocation, CellRange
+
+cell_range = CellRange.from_string('B4:E14')
+CellLocation(cell='C5') in cell_range   # True (inside range)
+CellLocation(cell='A1') in cell_range   # False (outside range)
+CellLocation(cell='B4') in cell_range   # True (at corner)
+CellLocation(cell='E14') in cell_range  # True (at corner)
+```
+
 ### Local Preview Mode
 
 Test your dashboard without API credentials:

@@ -181,3 +181,24 @@ class CellRange:
         Returns 'A1' for single cells, 'B4:E14' for multi-cell ranges.
         """
         return self.value
+
+    def __contains__(self, item: CellLocation) -> bool:
+        """Check if a CellLocation is within this range.
+
+        Args:
+            item: A CellLocation to check.
+
+        Returns:
+            True if the cell is within the range bounds.
+
+        Example:
+            >>> cell_range = CellRange.from_string('B4:E14')
+            >>> CellLocation(cell='C5') in cell_range
+            True
+            >>> CellLocation(cell='A1') in cell_range
+            False
+        """
+        return (
+            self.start_row <= item.row <= self.end_row
+            and self.start_col <= item.col <= self.end_col
+        )
