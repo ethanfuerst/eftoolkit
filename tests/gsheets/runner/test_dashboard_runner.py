@@ -9,6 +9,7 @@ import pytest
 from eftoolkit.gsheets.runner import (
     CellLocation,
     DashboardRunner,
+    HookContext,
     WorksheetAsset,
     WorksheetFormatting,
     WorksheetRegistry,
@@ -161,7 +162,7 @@ def test_phase_3_write_data_local_preview(tmp_path):
         mock_spreadsheet.create_worksheet.return_value = mock_worksheet
         mock_ss.return_value = mock_spreadsheet
 
-        runner._phase_3_write_data()
+        runner._phase_3_write_data_and_run_hooks()
 
         mock_ss.assert_called_once_with(
             credentials=None,
@@ -262,54 +263,79 @@ def test_phase_4_merges_config_path_and_format_dict(tmp_path):
         mock_load.assert_called_once_with(format_file)
 
 
-def test_phase_5_runs_hooks():
-    """Phase 5 executes post-write hooks."""
-    hook_called = []
+def test_phase_3_runs_hooks_with_context():
+    """Phase 3 executes post-write hooks with HookContext."""
+    received_contexts = []
 
-    def test_hook():
-        hook_called.append(True)
+    def test_hook(ctx: HookContext):
+        received_contexts.append(ctx)
 
     ws = MockWorksheetDefinition('WithHooks', post_write_hooks=[test_hook])
 
     runner = DashboardRunner(
         config={'sheet_name': 'Test'},
-        credentials={'type': 'service_account'},
+        credentials={},
         worksheets=[ws],
+        local_preview=True,
     )
 
     runner._phase_2_generate_data()
-    runner._phase_5_run_hooks()
 
-    assert len(hook_called) == 1
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data_and_run_hooks()
+
+    assert len(received_contexts) == 1
+    ctx = received_contexts[0]
+    assert ctx.worksheet == mock_worksheet
+    assert ctx.worksheet_name == 'WithHooks'
+    assert ctx.asset.df.equals(pd.DataFrame({'a': [1, 2, 3]}))
+    assert 'WithHooks' in ctx.runner_context
 
 
-def test_phase_5_runs_multiple_hooks():
-    """Phase 5 executes all hooks from all assets."""
+def test_phase_3_runs_multiple_hooks():
+    """Phase 3 executes all hooks from all assets."""
     hook_calls = []
 
-    def hook_a():
-        hook_calls.append('a')
+    def hook_a(ctx: HookContext):
+        hook_calls.append(('a', ctx.worksheet_name))
 
-    def hook_b():
-        hook_calls.append('b')
+    def hook_b(ctx: HookContext):
+        hook_calls.append(('b', ctx.worksheet_name))
 
     ws1 = MockWorksheetDefinition('Sheet1', post_write_hooks=[hook_a])
     ws2 = MockWorksheetDefinition('Sheet2', post_write_hooks=[hook_b])
 
     runner = DashboardRunner(
         config={'sheet_name': 'Test'},
-        credentials={'type': 'service_account'},
+        credentials={},
         worksheets=[ws1, ws2],
+        local_preview=True,
     )
 
     runner._phase_2_generate_data()
-    runner._phase_5_run_hooks()
 
-    assert hook_calls == ['a', 'b']
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_worksheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_spreadsheet.create_worksheet.return_value = mock_worksheet
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_3_write_data_and_run_hooks()
+
+    assert hook_calls == [('a', 'Sheet1'), ('b', 'Sheet2')]
 
 
-def test_phase_6_logs_summary(caplog):
-    """Phase 6 logs a summary of the run."""
+def test_phase_5_logs_summary(caplog):
+    """Phase 5 logs a summary of the run."""
     ws1 = MockWorksheetDefinition('Sheet1', pd.DataFrame({'a': [1, 2]}))
     ws2 = MockWorksheetDefinition('Sheet2', pd.DataFrame({'b': [3, 4, 5]}))
 
@@ -322,7 +348,7 @@ def test_phase_6_logs_summary(caplog):
     runner._phase_2_generate_data()
 
     with caplog.at_level(logging.INFO):
-        runner._phase_6_log_summary()
+        runner._phase_5_log_summary()
 
     assert 'Sheet1' in caplog.text
     assert 'Sheet2' in caplog.text
@@ -330,7 +356,7 @@ def test_phase_6_logs_summary(caplog):
 
 
 def test_run_executes_all_phases():
-    """run() executes all 6 phases."""
+    """run() executes all 5 phases."""
     ws = MockWorksheetDefinition('TestSheet')
 
     runner = DashboardRunner(
@@ -343,10 +369,9 @@ def test_run_executes_all_phases():
     with (
         patch.object(runner, '_phase_1_validate_structure') as p1,
         patch.object(runner, '_phase_2_generate_data') as p2,
-        patch.object(runner, '_phase_3_write_data') as p3,
+        patch.object(runner, '_phase_3_write_data_and_run_hooks') as p3,
         patch.object(runner, '_phase_4_apply_formatting') as p4,
-        patch.object(runner, '_phase_5_run_hooks') as p5,
-        patch.object(runner, '_phase_6_log_summary') as p6,
+        patch.object(runner, '_phase_5_log_summary') as p5,
     ):
         runner.run()
 
@@ -355,7 +380,6 @@ def test_run_executes_all_phases():
         p3.assert_called_once()
         p4.assert_called_once()
         p5.assert_called_once()
-        p6.assert_called_once()
 
 
 def test_run_with_local_preview(tmp_path):
@@ -486,7 +510,7 @@ def test_phase_3_writes_data_without_formatting():
         mock_spreadsheet.create_worksheet.return_value = mock_worksheet
         mock_ss.return_value = mock_spreadsheet
 
-        runner._phase_3_write_data()
+        runner._phase_3_write_data_and_run_hooks()
 
         # write_dataframe should be called without format_dict
         call_kwargs = mock_worksheet.write_dataframe.call_args[1]
@@ -537,7 +561,7 @@ def test_multiple_assets_per_worksheet():
         mock_spreadsheet.create_worksheet.return_value = mock_worksheet
         mock_ss.return_value = mock_spreadsheet
 
-        runner._phase_3_write_data()
+        runner._phase_3_write_data_and_run_hooks()
 
         # Should have 2 write calls for the 2 assets
         assert mock_worksheet.write_dataframe.call_count == 2
