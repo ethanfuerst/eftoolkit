@@ -356,7 +356,7 @@ def test_phase_5_logs_summary(caplog):
 
 
 def test_run_executes_all_phases():
-    """run() executes all 5 phases."""
+    """run() executes all 6 phases."""
     ws = MockWorksheetDefinition('TestSheet')
 
     runner = DashboardRunner(
@@ -367,6 +367,7 @@ def test_run_executes_all_phases():
     )
 
     with (
+        patch.object(runner, '_phase_0_run_pre_hooks') as p0,
         patch.object(runner, '_phase_1_validate_structure') as p1,
         patch.object(runner, '_phase_2_generate_data') as p2,
         patch.object(runner, '_phase_3_write_data_and_run_hooks') as p3,
@@ -375,6 +376,7 @@ def test_run_executes_all_phases():
     ):
         runner.run()
 
+        p0.assert_called_once()
         p1.assert_called_once()
         p2.assert_called_once()
         p3.assert_called_once()
@@ -571,3 +573,135 @@ def test_multiple_assets_per_worksheet():
         ]
         assert 'A1' in locations
         assert 'A5' in locations
+
+
+def test_phase_0_runs_pre_hooks_with_spreadsheet():
+    """Phase 0 executes pre-run hooks with Spreadsheet instance."""
+    received_spreadsheets = []
+
+    def test_hook(ss):
+        received_spreadsheets.append(ss)
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        pre_run_hooks=[test_hook],
+    )
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_0_run_pre_hooks()
+
+    assert len(received_spreadsheets) == 1
+    assert received_spreadsheets[0] == mock_spreadsheet
+
+
+def test_phase_0_runs_multiple_hooks_in_order():
+    """Phase 0 executes multiple pre-run hooks in order."""
+    call_order = []
+
+    def hook_a(ss):
+        call_order.append('a')
+
+    def hook_b(ss):
+        call_order.append('b')
+
+    def hook_c(ss):
+        call_order.append('c')
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        pre_run_hooks=[hook_a, hook_b, hook_c],
+    )
+
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        mock_spreadsheet = MagicMock()
+        mock_spreadsheet.__enter__ = MagicMock(return_value=mock_spreadsheet)
+        mock_spreadsheet.__exit__ = MagicMock(return_value=None)
+        mock_ss.return_value = mock_spreadsheet
+
+        runner._phase_0_run_pre_hooks()
+
+    assert call_order == ['a', 'b', 'c']
+
+
+def test_phase_0_skipped_in_local_preview_mode(caplog):
+    """Phase 0 skips pre-run hooks in local_preview mode."""
+    hook_called = []
+
+    def test_hook(ss):
+        hook_called.append(True)
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={},
+        worksheets=[ws],
+        pre_run_hooks=[test_hook],
+        local_preview=True,
+    )
+
+    with caplog.at_level(logging.INFO):
+        runner._phase_0_run_pre_hooks()
+
+    assert hook_called == []
+    assert 'Skipping pre-run hooks' in caplog.text
+
+
+def test_phase_0_no_op_with_empty_hooks():
+    """Phase 0 is a no-op when no pre-run hooks are provided."""
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    # Should not raise and should not try to open Spreadsheet
+    with patch('eftoolkit.gsheets.runner.dashboard_runner.Spreadsheet') as mock_ss:
+        runner._phase_0_run_pre_hooks()
+        mock_ss.assert_not_called()
+
+
+def test_init_stores_pre_run_hooks():
+    """DashboardRunner stores pre_run_hooks from init."""
+
+    def hook(ss):
+        pass
+
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+        pre_run_hooks=[hook],
+    )
+
+    assert runner.pre_run_hooks == [hook]
+
+
+def test_init_defaults_pre_run_hooks_to_empty_list():
+    """DashboardRunner defaults pre_run_hooks to empty list."""
+    ws = MockWorksheetDefinition('TestSheet')
+
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials={'type': 'service_account'},
+        worksheets=[ws],
+    )
+
+    assert runner.pre_run_hooks == []

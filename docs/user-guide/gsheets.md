@@ -296,8 +296,9 @@ ss = Spreadsheet(
 
 ## Dashboard Runner
 
-For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 5-phase workflow:
+For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 6-phase workflow:
 
+0. **Run pre-run hooks** - Optional setup operations (create/delete/reorder worksheets)
 1. **Validate structure** - Check spreadsheet access and permissions
 2. **Generate data** - Create all DataFrames (no API calls)
 3. **Write data and run hooks** - Write DataFrames to worksheets and execute post-write hooks
@@ -448,6 +449,35 @@ class FormattedWorksheet:
 | `format_dict` | `dict \| None` | Inline format configuration |
 
 When both `format_config_path` and `format_dict` are provided, they are merged with `format_dict` taking precedence.
+
+### Pre-Run Hooks
+
+Execute setup operations before the main workflow runs. Pre-run hooks receive a `Spreadsheet` instance for operations like creating, deleting, or reordering worksheets:
+
+```python
+from eftoolkit.gsheets import Spreadsheet
+
+def ensure_worksheets_exist(ss: Spreadsheet) -> None:
+    """Create worksheets that aren't managed by DashboardRunner."""
+    existing = ss.get_worksheet_names()
+    for name in ['Manual Input', 'Reference Data']:
+        if name not in existing:
+            ss.create_worksheet(name, rows=100, cols=10)
+
+def reorder_tabs(ss: Spreadsheet) -> None:
+    """Ensure tabs appear in the desired order."""
+    ss.reorder_worksheets(['Summary', 'Details', 'Manual Input', 'Reference Data'])
+
+runner = DashboardRunner(
+    config={'sheet_name': 'My Report'},
+    credentials=credentials,
+    worksheets=[SummaryWorksheet(), DetailsWorksheet()],
+    pre_run_hooks=[ensure_worksheets_exist, reorder_tabs],
+)
+runner.run()
+```
+
+Pre-run hooks are skipped in `local_preview` mode since they typically perform API operations.
 
 ### Post-Write Hooks
 

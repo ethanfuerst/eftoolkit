@@ -1,7 +1,8 @@
-"""DashboardRunner: 5-phase workflow orchestrator.
+"""DashboardRunner: 6-phase workflow orchestrator.
 
 Orchestrates the complete workflow for updating Google Sheets dashboards:
 
+0. Run pre-run hooks (optional setup operations)
 1. Validate structure (worksheets exist, permissions)
 2. Generate all DataFrames (pure data phase, no API calls)
 3. Write all DataFrames to worksheets and run post-write hooks (I/O phase)
@@ -26,8 +27,14 @@ Example usage:
     runner.run()
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from eftoolkit.gsheets.core import Spreadsheet as SpreadsheetType
 
 from eftoolkit.gsheets.core import Spreadsheet
 from eftoolkit.gsheets.runner.registry import WorksheetRegistry
@@ -50,15 +57,21 @@ class DashboardRunner:
     Attributes:
         config: Configuration dictionary passed to worksheet generate() methods.
         credentials: Google service account credentials dictionary.
+        pre_run_hooks: List of callables that receive a Spreadsheet instance
+            and run before the main workflow for setup operations.
         context: Shared state dictionary populated during generation and available
             to subsequent worksheets.
         results: Dictionary mapping worksheet names to their generated assets.
 
     Example:
+        >>> def reorder_tabs(ss: Spreadsheet) -> None:
+        ...     ss.reorder_worksheets(['Summary', 'Details', 'Reference'])
+        ...
         >>> runner = DashboardRunner(
-        ...     config={'db': conn, 'sheet_name': 'Q1 Report'},
+        ...     config={'sheet_name': 'My Report'},
         ...     credentials=credentials,
-        ...     worksheets=[RevenueWorksheet(), ExpensesWorksheet()],
+        ...     worksheets=[SummaryWorksheet(), DetailsWorksheet()],
+        ...     pre_run_hooks=[reorder_tabs],
         ... )
         >>> runner.run()
     """
@@ -69,6 +82,7 @@ class DashboardRunner:
         credentials: dict[str, Any],
         worksheets: list[WorksheetDefinition] | None = None,
         *,
+        pre_run_hooks: list[Callable[[SpreadsheetType], None]] | None = None,
         local_preview: bool = False,
     ) -> None:
         """Initialize DashboardRunner.
@@ -79,6 +93,10 @@ class DashboardRunner:
             credentials: Google service account credentials dictionary.
             worksheets: List of worksheet definitions to process. If None,
                 uses worksheets from WorksheetRegistry.
+            pre_run_hooks: List of callables that receive a Spreadsheet instance.
+                Run before the main workflow for setup operations like creating
+                worksheets, deleting worksheets, or reordering tabs.
+                Skipped in local_preview mode.
             local_preview: If True, render to local HTML instead of Google Sheets.
 
         Raises:
@@ -90,6 +108,7 @@ class DashboardRunner:
 
         self.config = config
         self.credentials = credentials
+        self.pre_run_hooks = pre_run_hooks or []
         self.local_preview = local_preview
 
         if worksheets is not None:
@@ -106,9 +125,10 @@ class DashboardRunner:
         self.results: dict[str, list[WorksheetAsset]] = {}
 
     def run(self) -> None:
-        """Execute the full 5-phase workflow.
+        """Execute the full 6-phase workflow.
 
         Phases:
+            0. Run pre-run hooks (optional setup)
             1. Validate structure
             2. Generate data
             3. Write data and run hooks
@@ -120,6 +140,7 @@ class DashboardRunner:
         """
         logger.info('Starting dashboard run for: %s', self.config['sheet_name'])
 
+        self._phase_0_run_pre_hooks()
         self._phase_1_validate_structure()
         self._phase_2_generate_data()
         self._phase_3_write_data_and_run_hooks()
@@ -127,6 +148,31 @@ class DashboardRunner:
         self._phase_5_log_summary()
 
         logger.info('Dashboard run complete')
+
+    def _phase_0_run_pre_hooks(self) -> None:
+        """Phase 0: Run pre-run hooks for setup operations.
+
+        Executes pre-run hooks with an open Spreadsheet context,
+        allowing operations like creating/deleting worksheets and
+        reordering tabs before the main workflow runs.
+
+        Skipped if no pre-run hooks provided or in local_preview mode.
+        """
+        if not self.pre_run_hooks:
+            return
+
+        if self.local_preview:
+            logger.info('Phase 0: Skipping pre-run hooks (local_preview mode)')
+            return
+
+        logger.info('Phase 0: Running pre-run hooks')
+        with Spreadsheet(
+            credentials=self.credentials,
+            spreadsheet_name=self.config['sheet_name'],
+        ) as ss:
+            for hook in self.pre_run_hooks:
+                hook(ss)
+        logger.info('  Executed %d pre-run hooks', len(self.pre_run_hooks))
 
     def _phase_1_validate_structure(self) -> None:
         """Phase 1: Validate sheet structure.
