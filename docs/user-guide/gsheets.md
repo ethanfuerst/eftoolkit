@@ -646,17 +646,24 @@ cell_range.value  # 'B4:E14'
 str(cell_range)   # 'B4:E14'
 ```
 
-Check if a cell is within a range using the `in` operator:
+Check if a cell or range is within a range using the `in` operator:
 
 ```python
 from eftoolkit.gsheets.runner import CellLocation, CellRange
 
-cell_range = CellRange.from_string('B4:E14')
-CellLocation(cell='C5') in cell_range   # True (inside range)
-CellLocation(cell='A1') in cell_range   # False (outside range)
-CellLocation(cell='B4') in cell_range   # True (at corner)
-CellLocation(cell='E14') in cell_range  # True (at corner)
+outer = CellRange.from_string('B4:E14')
+
+# Check if a CellLocation is within the range
+CellLocation(cell='C5') in outer   # True (inside range)
+CellLocation(cell='A1') in outer   # False (outside range)
+
+# Check if a CellRange is fully contained within another range
+CellRange.from_string('C5:D10') in outer  # True (fully inside)
+CellRange.from_string('A1:C5') in outer   # False (extends outside)
+CellRange.from_string('B4:E14') in outer  # True (exact match)
 ```
+
+This is useful for validating that formatting operations target ranges within an asset's bounds.
 
 ### Local Preview Mode
 

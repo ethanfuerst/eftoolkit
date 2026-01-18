@@ -182,22 +182,34 @@ class CellRange:
         """
         return self.value
 
-    def __contains__(self, item: CellLocation) -> bool:
-        """Check if a CellLocation is within this range.
+    def __contains__(self, item: CellLocation | CellRange) -> bool:
+        """Check if a CellLocation or CellRange is within this range.
+
+        For CellLocation: Returns True if the cell is within the range bounds.
+        For CellRange: Returns True if the entire range is contained within this range.
 
         Args:
-            item: A CellLocation to check.
+            item: A CellLocation or CellRange to check.
 
         Returns:
-            True if the cell is within the range bounds.
+            True if the item is fully within this range.
 
         Example:
-            >>> cell_range = CellRange.from_string('B4:E14')
-            >>> CellLocation(cell='C5') in cell_range
+            >>> outer = CellRange.from_string('B4:E14')
+            >>> CellLocation(cell='C5') in outer
             True
-            >>> CellLocation(cell='A1') in cell_range
+            >>> CellRange.from_string('C5:D10') in outer
+            True
+            >>> CellRange.from_string('A1:C5') in outer
             False
         """
+        if isinstance(item, CellRange):
+            return (
+                self.start_row <= item.start_row
+                and item.end_row <= self.end_row
+                and self.start_col <= item.start_col
+                and item.end_col <= self.end_col
+            )
         return (
             self.start_row <= item.row <= self.end_row
             and self.start_col <= item.col <= self.end_col

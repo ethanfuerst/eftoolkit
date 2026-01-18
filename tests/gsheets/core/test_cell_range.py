@@ -406,3 +406,117 @@ def test_contains_with_double_letter_columns():
     assert CellLocation(cell='AB5') in cell_range
     assert CellLocation(cell='Z5') not in cell_range
     assert CellLocation(cell='AE5') not in cell_range
+
+
+# __contains__ tests for CellRange in CellRange
+
+
+def test_contains_range_fully_inside():
+    """Inner range fully inside outer range returns True."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('C5:D10')
+
+    assert inner in outer
+
+
+def test_contains_range_equal():
+    """Range contains itself."""
+    cell_range = CellRange.from_string('B4:E14')
+
+    assert cell_range in cell_range
+
+
+def test_contains_range_at_corners():
+    """Range that exactly matches outer range returns True."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('B4:E14')
+
+    assert inner in outer
+
+
+def test_contains_range_at_top_left():
+    """Inner range at top-left corner returns True."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('B4:C6')
+
+    assert inner in outer
+
+
+def test_contains_range_at_bottom_right():
+    """Inner range at bottom-right corner returns True."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('D10:E14')
+
+    assert inner in outer
+
+
+def test_contains_range_extends_left():
+    """Range extending beyond left boundary returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('A5:D10')
+
+    assert inner not in outer
+
+
+def test_contains_range_extends_right():
+    """Range extending beyond right boundary returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('C5:F10')
+
+    assert inner not in outer
+
+
+def test_contains_range_extends_above():
+    """Range extending beyond top boundary returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('C2:D10')
+
+    assert inner not in outer
+
+
+def test_contains_range_extends_below():
+    """Range extending beyond bottom boundary returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('C5:D16')
+
+    assert inner not in outer
+
+
+def test_contains_range_completely_outside():
+    """Range completely outside returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('G20:H25')
+
+    assert inner not in outer
+
+
+def test_contains_range_partial_overlap():
+    """Partially overlapping range returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('A1:C5')
+
+    assert inner not in outer
+
+
+def test_contains_single_cell_range_inside():
+    """Single cell as CellRange inside outer range returns True."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('C5')
+
+    assert inner in outer
+
+
+def test_contains_single_cell_range_outside():
+    """Single cell as CellRange outside outer range returns False."""
+    outer = CellRange.from_string('B4:E14')
+    inner = CellRange.from_string('A1')
+
+    assert inner not in outer
+
+
+def test_contains_range_larger_than_outer():
+    """Range larger than outer returns False."""
+    outer = CellRange.from_string('C5:D10')
+    inner = CellRange.from_string('B4:E14')
+
+    assert inner not in outer
