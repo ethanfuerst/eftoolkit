@@ -490,6 +490,44 @@ class Worksheet:
             }
         )
 
+    def resize_sheet(
+        self,
+        rows: int | None = None,
+        columns: int | None = None,
+    ) -> None:
+        """Queue worksheet resize to keep only the specified number of rows and columns.
+
+        This method resizes the worksheet by setting the grid properties to the
+        specified dimensions. Any data beyond the new dimensions will be deleted.
+
+        Args:
+            rows: Number of rows to keep. If None, rows are not changed.
+            columns: Number of columns to keep. If None, columns are not changed.
+
+        Raises:
+            ValueError: If both rows and columns are None.
+
+        Example:
+            # Keep only the first 3 rows and 4 columns
+            ws.resize_sheet(rows=3, columns=4)
+
+            # Keep only the first 5 rows (columns unchanged)
+            ws.resize_sheet(rows=5)
+
+            # Keep only the first 10 columns (rows unchanged)
+            ws.resize_sheet(columns=10)
+        """
+        if rows is None and columns is None:
+            raise ValueError('At least one of rows or columns must be specified')
+
+        self._batch_requests.append(
+            {
+                'type': 'resize_sheet',
+                'rows': rows,
+                'columns': columns,
+            }
+        )
+
     def freeze_rows(
         self,
         num_rows: int,
@@ -1064,6 +1102,39 @@ class Worksheet:
                 {'requests': [request]}
             ),
             'freeze_columns',
+        )
+
+    @batch_handler('resize_sheet')
+    def _handle_resize_sheet(self, req: dict) -> None:
+        """Handle resize sheet request.
+
+        API: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#updatesheetpropertiesrequest
+        """
+        grid_properties = {}
+        fields = []
+
+        if req['rows'] is not None:
+            grid_properties['rowCount'] = req['rows']
+            fields.append('gridProperties.rowCount')
+
+        if req['columns'] is not None:
+            grid_properties['columnCount'] = req['columns']
+            fields.append('gridProperties.columnCount')
+
+        request = {
+            'updateSheetProperties': {
+                'properties': {
+                    'sheetId': self._ws.id,
+                    'gridProperties': grid_properties,
+                },
+                'fields': ','.join(fields),
+            }
+        }
+        self._spreadsheet._execute_with_retry(
+            lambda: self._spreadsheet._gspread_spreadsheet.batch_update(
+                {'requests': [request]}
+            ),
+            'resize_sheet',
         )
 
     @batch_handler('raw')

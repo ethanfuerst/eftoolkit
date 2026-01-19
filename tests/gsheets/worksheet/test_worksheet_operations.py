@@ -296,6 +296,61 @@ def test_worksheet_freeze_columns_queues():
     assert ws._batch_requests[0]['num_cols'] == 1
 
 
+# --- Resize Sheet Operations ---
+
+
+def test_worksheet_resize_sheet_rows_only():
+    """resize_sheet with rows only queues correct request."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.resize_sheet(rows=5)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'resize_sheet'
+    assert ws._batch_requests[0]['rows'] == 5
+    assert ws._batch_requests[0]['columns'] is None
+
+
+def test_worksheet_resize_sheet_columns_only():
+    """resize_sheet with columns only queues correct request."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.resize_sheet(columns=10)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'resize_sheet'
+    assert ws._batch_requests[0]['rows'] is None
+    assert ws._batch_requests[0]['columns'] == 10
+
+
+def test_worksheet_resize_sheet_both_rows_and_columns():
+    """resize_sheet with both rows and columns queues correct request."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.resize_sheet(rows=3, columns=4)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'resize_sheet'
+    assert ws._batch_requests[0]['rows'] == 3
+    assert ws._batch_requests[0]['columns'] == 4
+
+
+def test_worksheet_resize_sheet_requires_at_least_one_param():
+    """resize_sheet raises ValueError when neither rows nor columns specified."""
+    import pytest
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    with pytest.raises(
+        ValueError, match='At least one of rows or columns must be specified'
+    ):
+        ws.resize_sheet()
+
+
 # --- Merge Operations ---
 
 
