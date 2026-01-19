@@ -13,6 +13,7 @@ from eftoolkit.gsheets.utils import (
     BATCH_HANDLERS,
     batch_handler,
     column_index_to_letter,
+    column_letter_to_index,
     parse_cell_reference,
 )
 
@@ -727,10 +728,7 @@ class Worksheet:
         width = req['width']
         # Convert letter to 0-based index
         if isinstance(column, str):
-            col_idx = 0
-            for char in column.upper():
-                col_idx = col_idx * 26 + (ord(char) - ord('A') + 1)
-            col_idx -= 1
+            col_idx = column_letter_to_index(column)
         else:
             col_idx = column - 1  # Convert 1-based to 0-based
 
@@ -1199,10 +1197,7 @@ class Worksheet:
                 col = req['column']
                 # Convert letter to index if needed
                 if isinstance(col, str):
-                    col_idx = 0
-                    for char in col.upper():
-                        col_idx = col_idx * 26 + (ord(char) - ord('A') + 1)
-                    col_idx -= 1
+                    col_idx = column_letter_to_index(col)
                 else:
                     col_idx = col - 1  # Convert 1-indexed to 0-indexed
                 self._preview_column_widths[col_idx] = req['width']
