@@ -3,6 +3,7 @@
 import pytest
 
 from eftoolkit.gsheets.runner import CellLocation
+from eftoolkit.gsheets.utils import column_index_to_letter, column_letter_to_index
 
 
 def test_create_with_cell():
@@ -117,24 +118,24 @@ def test_properties_with_large_row():
 
 
 def test_col_letter_to_index_single_letters():
-    """_col_letter_to_index handles single letters A-Z."""
-    assert CellLocation._col_letter_to_index('A') == 0
-    assert CellLocation._col_letter_to_index('B') == 1
-    assert CellLocation._col_letter_to_index('Z') == 25
+    """column_letter_to_index handles single letters A-Z."""
+    assert column_letter_to_index('A') == 0
+    assert column_letter_to_index('B') == 1
+    assert column_letter_to_index('Z') == 25
 
 
 def test_col_letter_to_index_double_letters():
-    """_col_letter_to_index handles double letters AA, AB, etc."""
-    assert CellLocation._col_letter_to_index('AA') == 26
-    assert CellLocation._col_letter_to_index('AB') == 27
-    assert CellLocation._col_letter_to_index('AZ') == 51
-    assert CellLocation._col_letter_to_index('BA') == 52
+    """column_letter_to_index handles double letters AA, AB, etc."""
+    assert column_letter_to_index('AA') == 26
+    assert column_letter_to_index('AB') == 27
+    assert column_letter_to_index('AZ') == 51
+    assert column_letter_to_index('BA') == 52
 
 
 def test_col_letter_to_index_lowercase():
-    """_col_letter_to_index handles lowercase letters."""
-    assert CellLocation._col_letter_to_index('a') == 0
-    assert CellLocation._col_letter_to_index('aa') == 26
+    """column_letter_to_index handles lowercase letters."""
+    assert column_letter_to_index('a') == 0
+    assert column_letter_to_index('aa') == 26
 
 
 def test_parse_cell_simple():
@@ -288,18 +289,18 @@ def test_offset_large_positive():
 
 
 def test_offset_col_index_to_letter_single():
-    """_col_index_to_letter handles single letters A-Z."""
-    assert CellLocation._col_index_to_letter(0) == 'A'
-    assert CellLocation._col_index_to_letter(1) == 'B'
-    assert CellLocation._col_index_to_letter(25) == 'Z'
+    """column_index_to_letter handles single letters A-Z."""
+    assert column_index_to_letter(0) == 'A'
+    assert column_index_to_letter(1) == 'B'
+    assert column_index_to_letter(25) == 'Z'
 
 
 def test_offset_col_index_to_letter_double():
-    """_col_index_to_letter handles double letters AA, AB, etc."""
-    assert CellLocation._col_index_to_letter(26) == 'AA'
-    assert CellLocation._col_index_to_letter(27) == 'AB'
-    assert CellLocation._col_index_to_letter(51) == 'AZ'
-    assert CellLocation._col_index_to_letter(52) == 'BA'
+    """column_index_to_letter handles double letters AA, AB, etc."""
+    assert column_index_to_letter(26) == 'AA'
+    assert column_index_to_letter(27) == 'AB'
+    assert column_index_to_letter(51) == 'AZ'
+    assert column_index_to_letter(52) == 'BA'
 
 
 def test_offset_equality_with_same_offsets():

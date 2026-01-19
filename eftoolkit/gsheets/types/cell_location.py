@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from functools import cached_property
 
+from eftoolkit.gsheets.utils import column_index_to_letter, column_letter_to_index
+
 
 @dataclass(frozen=True)
 class CellLocation:
@@ -68,38 +70,6 @@ class CellLocation:
         row = int(''.join(c for c in cell if c.isdigit()))
         return col, row
 
-    @staticmethod
-    def _col_letter_to_index(col_letter: str) -> int:
-        """Convert column letter(s) to 0-indexed column number.
-
-        Args:
-            col_letter: Column letter(s) (e.g., 'A', 'B', 'AA').
-
-        Returns:
-            0-indexed column number (A=0, B=1, Z=25, AA=26).
-        """
-        col = 0
-        for char in col_letter.upper():
-            col = col * 26 + (ord(char) - ord('A') + 1)
-        return col - 1
-
-    @staticmethod
-    def _col_index_to_letter(index: int) -> str:
-        """Convert 0-indexed column number to column letter(s).
-
-        Args:
-            index: 0-indexed column number (0=A, 1=B, 25=Z, 26=AA).
-
-        Returns:
-            Column letter(s) (e.g., 'A', 'B', 'AA').
-        """
-        result = ''
-        index += 1  # Convert to 1-indexed for calculation
-        while index > 0:
-            index, remainder = divmod(index - 1, 26)
-            result = chr(ord('A') + remainder) + result
-        return result
-
     @cached_property
     def _parsed(self) -> tuple[str, int]:
         """Cached parsed cell reference (base cell without offsets)."""
@@ -108,7 +78,7 @@ class CellLocation:
     @cached_property
     def _base_col_index(self) -> int:
         """0-indexed column number of the base cell (without offset)."""
-        return self._col_letter_to_index(self._parsed[0])
+        return column_letter_to_index(self._parsed[0])
 
     @cached_property
     def _base_row_1indexed(self) -> int:
@@ -121,7 +91,7 @@ class CellLocation:
 
         Example: 'B4' → 'B', CellLocation('I2', offset_cols=1) → 'J'.
         """
-        return self._col_index_to_letter(self.col)
+        return column_index_to_letter(self.col)
 
     @property
     def row_1indexed(self) -> int:

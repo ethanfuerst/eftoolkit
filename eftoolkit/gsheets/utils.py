@@ -55,6 +55,31 @@ def column_index_to_letter(index: int) -> str:
     return result
 
 
+def column_letter_to_index(col_letter: str) -> int:
+    """Convert Excel-style column letter(s) to a 0-indexed column index.
+
+    Args:
+        col_letter: Column letter(s) (e.g., 'A', 'B', 'Z', 'AA', 'AB')
+
+    Returns:
+        0-indexed column number (A=0, B=1, Z=25, AA=26, AB=27, etc.)
+
+    Example:
+        >>> column_letter_to_index('A')
+        0
+        >>> column_letter_to_index('Z')
+        25
+        >>> column_letter_to_index('AA')
+        26
+        >>> column_letter_to_index('AB')
+        27
+    """
+    col = 0
+    for char in col_letter.upper():
+        col = col * 26 + (ord(char) - ord('A') + 1)
+    return col - 1
+
+
 def parse_cell_reference(cell_ref: str) -> tuple[int | None, int]:
     """Parse a cell reference like 'A1' or 'Sheet1!B2' into (row, col) 0-indexed.
 
@@ -88,11 +113,7 @@ def parse_cell_reference(cell_ref: str) -> tuple[int | None, int]:
         else:
             return 0, 0  # Default to A1 if parsing fails
 
-    # Convert column letters to index (A=0, B=1, ..., Z=25, AA=26, etc.)
-    col = 0
-    for char in col_str.upper():
-        col = col * 26 + (ord(char) - ord('A') + 1)
-    col -= 1  # Convert to 0-indexed
+    col = column_letter_to_index(col_str)
 
     return row, col
 

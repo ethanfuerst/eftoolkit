@@ -1,6 +1,10 @@
 """Tests for gsheets utility functions."""
 
-from eftoolkit.gsheets.utils import column_index_to_letter, parse_cell_reference
+from eftoolkit.gsheets.utils import (
+    column_index_to_letter,
+    column_letter_to_index,
+    parse_cell_reference,
+)
 
 # column_index_to_letter tests
 
@@ -24,6 +28,44 @@ def test_column_index_to_letter_triple_letters():
     """Triple letters for very wide spreadsheets."""
     # 26 + 26*26 = 702 is the first AAA
     assert column_index_to_letter(702) == 'AAA'
+
+
+# column_letter_to_index tests
+
+
+def test_column_letter_to_index_single_letters():
+    """Single letters A-Z (indices 0-25)."""
+    assert column_letter_to_index('A') == 0
+    assert column_letter_to_index('B') == 1
+    assert column_letter_to_index('Z') == 25
+
+
+def test_column_letter_to_index_double_letters():
+    """Double letters AA, AB, etc. (indices 26+)."""
+    assert column_letter_to_index('AA') == 26
+    assert column_letter_to_index('AB') == 27
+    assert column_letter_to_index('AZ') == 51
+    assert column_letter_to_index('BA') == 52
+
+
+def test_column_letter_to_index_triple_letters():
+    """Triple letters for very wide spreadsheets."""
+    # 26 + 26*26 = 702 is the first AAA
+    assert column_letter_to_index('AAA') == 702
+
+
+def test_column_letter_to_index_lowercase():
+    """Lowercase letters are converted to uppercase."""
+    assert column_letter_to_index('a') == 0
+    assert column_letter_to_index('z') == 25
+    assert column_letter_to_index('aa') == 26
+
+
+def test_column_letter_to_index_roundtrip():
+    """column_letter_to_index and column_index_to_letter are inverse functions."""
+    for i in range(100):
+        letter = column_index_to_letter(i)
+        assert column_letter_to_index(letter) == i
 
 
 class TestParseCellReference:
