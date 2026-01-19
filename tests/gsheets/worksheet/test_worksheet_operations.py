@@ -156,6 +156,30 @@ def test_worksheet_set_borders_queues():
     assert ws._batch_requests[0]['type'] == 'border'
 
 
+def test_worksheet_set_borders_with_cell_location():
+    """set_borders accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.set_borders(CellLocation(cell='E5'), {'top': {'style': 'SOLID'}})
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'border'
+    assert ws._batch_requests[0]['range'] == CellLocation(cell='E5')
+
+
+def test_worksheet_set_borders_with_cell_range():
+    """set_borders accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.set_borders(CellRange.from_string('C3:F6'), {'top': {'style': 'SOLID'}})
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'border'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('C3:F6')
+
+
 def test_worksheet_set_notes_queues():
     """set_notes adds to batch_requests queue."""
     ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
@@ -183,6 +207,40 @@ def test_worksheet_add_conditional_format_queues():
     assert ws._batch_requests[0]['type'] == 'conditional_format'
     assert ws._batch_requests[0]['range'] == 'A1:A10'
     assert ws._batch_requests[0]['rule'] == rule
+
+
+def test_worksheet_add_conditional_format_with_cell_location():
+    """add_conditional_format accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    rule = {
+        'type': 'CUSTOM_FORMULA',
+        'values': ['=G5>100'],
+        'format': {'backgroundColor': {'red': 1}},
+    }
+    ws.add_conditional_format(CellLocation(cell='G5'), rule)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'conditional_format'
+    assert ws._batch_requests[0]['range'] == CellLocation(cell='G5')
+
+
+def test_worksheet_add_conditional_format_with_cell_range():
+    """add_conditional_format accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    rule = {
+        'type': 'CUSTOM_FORMULA',
+        'values': ['=A1>100'],
+        'format': {'backgroundColor': {'red': 1}},
+    }
+    ws.add_conditional_format(CellRange.from_string('D2:H8'), rule)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'conditional_format'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('D2:H8')
 
 
 # --- Column/Row Operations ---
@@ -377,6 +435,18 @@ def test_worksheet_merge_cells_with_type():
     assert ws._batch_requests[0]['merge_type'] == 'MERGE_COLUMNS'
 
 
+def test_worksheet_merge_cells_with_cell_range():
+    """merge_cells accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.merge_cells(CellRange.from_string('B2:E2'))
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'merge'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('B2:E2')
+
+
 def test_worksheet_unmerge_cells_queues():
     """unmerge_cells adds to batch_requests queue."""
     ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
@@ -387,6 +457,18 @@ def test_worksheet_unmerge_cells_queues():
     assert len(ws._batch_requests) == 1
     assert ws._batch_requests[0]['type'] == 'unmerge'
     assert ws._batch_requests[0]['range'] == 'A1:C1'
+
+
+def test_worksheet_unmerge_cells_with_cell_range():
+    """unmerge_cells accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.unmerge_cells(CellRange.from_string('B2:E2'))
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'unmerge'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('B2:E2')
 
 
 # --- Sort Operations ---
@@ -406,6 +488,19 @@ def test_worksheet_sort_range_queues():
     assert ws._batch_requests[0]['sort_specs'] == sort_specs
 
 
+def test_worksheet_sort_range_with_cell_range():
+    """sort_range accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    sort_specs = [{'column': 0, 'ascending': False}]
+    ws.sort_range(CellRange.from_string('B2:D15'), sort_specs)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'sort'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('B2:D15')
+
+
 # --- Data Validation Operations ---
 
 
@@ -423,6 +518,32 @@ def test_worksheet_set_data_validation_queues():
     assert ws._batch_requests[0]['rule'] == rule
 
 
+def test_worksheet_set_data_validation_with_cell_location():
+    """set_data_validation accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    rule = {'type': 'ONE_OF_LIST', 'values': ['Yes', 'No']}
+    ws.set_data_validation(CellLocation(cell='F8'), rule)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'data_validation'
+    assert ws._batch_requests[0]['range'] == CellLocation(cell='F8')
+
+
+def test_worksheet_set_data_validation_with_cell_range():
+    """set_data_validation accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    rule = {'type': 'ONE_OF_LIST', 'values': ['Yes', 'No']}
+    ws.set_data_validation(CellRange.from_string('C3:C20'), rule)
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'data_validation'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('C3:C20')
+
+
 def test_worksheet_clear_data_validation_queues():
     """clear_data_validation adds to batch_requests queue."""
     ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
@@ -433,6 +554,30 @@ def test_worksheet_clear_data_validation_queues():
     assert len(ws._batch_requests) == 1
     assert ws._batch_requests[0]['type'] == 'clear_data_validation'
     assert ws._batch_requests[0]['range'] == 'A1:A10'
+
+
+def test_worksheet_clear_data_validation_with_cell_location():
+    """clear_data_validation accepts CellLocation for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.clear_data_validation(CellLocation(cell='F8'))
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'clear_data_validation'
+    assert ws._batch_requests[0]['range'] == CellLocation(cell='F8')
+
+
+def test_worksheet_clear_data_validation_with_cell_range():
+    """clear_data_validation accepts CellRange for range_name parameter."""
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = ss.worksheet('Sheet1')
+
+    ws.clear_data_validation(CellRange.from_string('C3:C20'))
+
+    assert len(ws._batch_requests) == 1
+    assert ws._batch_requests[0]['type'] == 'clear_data_validation'
+    assert ws._batch_requests[0]['range'] == CellRange.from_string('C3:C20')
 
 
 # --- Raw Request Operations ---
