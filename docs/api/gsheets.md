@@ -47,6 +47,7 @@ Google Sheets client with automatic batching and dashboard orchestration.
         - delete_columns
         - freeze_rows
         - freeze_columns
+        - resize_sheet
         - add_raw_request
         - flush
         - open_preview

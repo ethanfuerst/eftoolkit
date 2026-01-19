@@ -195,6 +195,21 @@ ws.insert_columns(2, num_cols=1) # Insert column at B
 ws.delete_columns(3, num_cols=1) # Delete column C
 ```
 
+### Resize Sheet
+
+Resize the worksheet to keep only a specified number of rows and/or columns:
+
+```python
+# Keep only the first 3 rows and 4 columns
+ws.resize_sheet(rows=3, columns=4)
+
+# Keep only the first 5 rows (columns unchanged)
+ws.resize_sheet(rows=5)
+
+# Keep only the first 10 columns (rows unchanged)
+ws.resize_sheet(columns=10)
+```
+
 ### Sort Range
 
 ```python
