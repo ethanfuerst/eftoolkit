@@ -8,7 +8,7 @@ A personal Python toolkit providing reusable utilities for common tasks. Include
   - `sql/duckdb.py` - `DuckDB` class: query, execute, S3 read/write
   - `s3/filesystem.py` - `S3FileSystem` class: parquet read/write, file operations
   - `gsheets/core/` - `Spreadsheet` and `Worksheet` classes: worksheet operations with batching
-  - `gsheets/runner/` - `DashboardRunner`: 6-phase workflow orchestrator
+  - `gsheets/runner/` - `DashboardRunner`: 7-phase workflow orchestrator (phases 0–6)
   - `gsheets/runner/registry.py` - `WorksheetRegistry`: worksheet definition registry
   - `gsheets/runner/types/` - Type definitions for dashboard runner
   - `gsheets/utils.py` - JSON config loading, cell parsing utilities
@@ -42,7 +42,10 @@ uv run pytest --cov=eftoolkit --cov-report=term-missing
 
 ## Package imports
 
+`eftoolkit/__init__.py` only exposes `__version__`. Always import classes/functions from their submodules:
+
 ```python
+from eftoolkit import __version__
 from eftoolkit.sql import DuckDB
 from eftoolkit.s3 import S3FileSystem
 from eftoolkit.gsheets import Spreadsheet, Worksheet

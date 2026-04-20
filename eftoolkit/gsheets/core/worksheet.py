@@ -99,8 +99,10 @@ class Worksheet:
             The cell's value (string, number, or empty string if blank).
 
         Example:
+            ```python
             value = ws.read_cell('V5')
             value = ws.read_cell(CellLocation(cell='V5'))
+            ```
         """
         if self._local_preview:
             raise NotImplementedError('read_cell not available in local preview mode')
@@ -120,8 +122,10 @@ class Worksheet:
             Empty cells are represented as empty strings.
 
         Example:
+            ```python
             values = ws.read_range('V5:V10')
             values = ws.read_range(CellRange.from_string('V5:V10'))
+            ```
         """
         if self._local_preview:
             raise NotImplementedError('read_range not available in local preview mode')
@@ -330,7 +334,9 @@ class Worksheet:
                 - 'ascending': True for ascending, False for descending (default True)
 
         Example:
+            ```python
             ws.sort_range('A1:C10', [{'column': 0, 'ascending': True}])
+            ```
         """
         self._batch_requests.append(
             {
@@ -356,11 +362,13 @@ class Worksheet:
                 - 'strict': True to reject invalid input (default True)
 
         Example:
+            ```python
             ws.set_data_validation('A1:A10', {
                 'type': 'ONE_OF_LIST',
                 'values': ['Yes', 'No', 'Maybe'],
                 'showDropdown': True,
             })
+            ```
         """
         self._batch_requests.append(
             {
@@ -401,11 +409,13 @@ class Worksheet:
                 - 'format': Cell format to apply when condition is met
 
         Example:
+            ```python
             ws.add_conditional_format('A1:A10', {
                 'type': 'CUSTOM_FORMULA',
                 'values': ['=A1>100'],
                 'format': {'backgroundColor': {'red': 1, 'green': 0, 'blue': 0}},
             })
+            ```
         """
         self._batch_requests.append(
             {
@@ -509,6 +519,7 @@ class Worksheet:
             ValueError: If both rows and columns are None.
 
         Example:
+            ```python
             # Keep only the first 3 rows and 4 columns
             ws.resize_sheet(rows=3, columns=4)
 
@@ -517,6 +528,7 @@ class Worksheet:
 
             # Keep only the first 10 columns (rows unchanged)
             ws.resize_sheet(columns=10)
+            ```
         """
         if rows is None and columns is None:
             raise ValueError('At least one of rows or columns must be specified')
@@ -576,6 +588,7 @@ class Worksheet:
                 https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request
 
         Example:
+            ```python
             # Add a named range
             ws.add_raw_request({
                 'addNamedRange': {
@@ -591,6 +604,7 @@ class Worksheet:
                     }
                 }
             })
+            ```
         """
         self._batch_requests.append(
             {

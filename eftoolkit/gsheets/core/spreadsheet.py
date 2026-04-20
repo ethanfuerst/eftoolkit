@@ -254,8 +254,10 @@ class Spreadsheet:
             order: List of worksheet titles in the desired order.
 
         Example:
+            ```python
             ss.reorder_worksheets(['Dashboard', 'Draft', 'Manual Adds'])
             # Dashboard first, then Draft, then Manual Adds, then any other tabs
+            ```
         """
         if self._local_preview:
             return
@@ -300,17 +302,20 @@ class Spreadsheet:
                 is used.
 
         Example:
-            >>> from eftoolkit.gsheets.runner import WorksheetFormatting
-            >>> with Spreadsheet(credentials, 'My Sheet') as ss:
-            ...     ss.create_worksheet('Report', replace=True)
-            ...     # ... write data ...
-            ...     formatting = WorksheetFormatting(
-            ...         freeze_rows=1,
-            ...         auto_resize_columns=(0, 5),
-            ...         notes={'A1': 'Header'},
-            ...     )
-            ...     ss.apply_formatting('Report', formatting)
-            # All formatting applied on context exit
+            ```python
+            from eftoolkit.gsheets.runner import WorksheetFormatting
+
+            with Spreadsheet(credentials, 'My Sheet') as ss:
+                ss.create_worksheet('Report', replace=True)
+                # ... write data ...
+                formatting = WorksheetFormatting(
+                    freeze_rows=1,
+                    auto_resize_columns=(0, 5),
+                    notes={'A1': 'Header'},
+                )
+                ss.apply_formatting('Report', formatting)
+                # All formatting applied on context exit
+            ```
         """
         ws = self.worksheet(worksheet_name)
 

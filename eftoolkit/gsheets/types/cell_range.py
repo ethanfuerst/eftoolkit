@@ -12,40 +12,24 @@ from eftoolkit.gsheets.utils import column_index_to_letter
 class CellRange:
     """A range of cells in A1 notation.
 
-    Can represent:
-    - Single cells: 'A1' (start == end)
-    - Multi-cell ranges: 'B4:E14'
+    Represents either a single cell (`'A1'`, where `start == end`) or a
+    multi-cell range (`'B4:E14'`). Computed properties such as `start_row`,
+    `end_row`, `num_rows`, `num_cols`, `is_single_cell`, and `value` are
+    documented on their individual `@property` methods below.
 
     Attributes:
         start: The top-left cell of the range.
         end: The bottom-right cell of the range.
 
-    Computed Properties:
-        start_row: 0-indexed start row.
-        end_row: 0-indexed end row.
-        start_col: 0-indexed start column.
-        end_col: 0-indexed end column.
-        start_row_1indexed: 1-indexed start row for Google Sheets API.
-        end_row_1indexed: 1-indexed end row for Google Sheets API.
-        start_col_letter: Start column letter(s).
-        end_col_letter: End column letter(s).
-        num_rows: Number of rows in the range.
-        num_cols: Number of columns in the range.
-        is_single_cell: True if range is a single cell.
-        value: A1 notation string representation of the range.
-
     Example:
-        >>> cell_range = CellRange.from_string('B4:E14')
-        >>> cell_range.start_row
-        3
-        >>> cell_range.end_row
-        13
-        >>> cell_range.num_rows
-        11
-        >>> cell_range.num_cols
-        4
-        >>> str(cell_range)
-        'B4:E14'
+        ```python
+        cell_range = CellRange.from_string('B4:E14')
+        cell_range.start_row    # 3
+        cell_range.end_row      # 13
+        cell_range.num_rows     # 11
+        cell_range.num_cols     # 4
+        str(cell_range)         # 'B4:E14'
+        ```
     """
 
     start: CellLocation
@@ -62,10 +46,12 @@ class CellRange:
             CellRange instance.
 
         Example:
-            >>> CellRange.from_string('B4:E14')
-            CellRange(start=CellLocation(cell='B4'), end=CellLocation(cell='E14'))
-            >>> CellRange.from_string('A1')
-            CellRange(start=CellLocation(cell='A1'), end=CellLocation(cell='A1'))
+            ```python
+            CellRange.from_string('B4:E14')
+            # CellRange(start=CellLocation(cell='B4'), end=CellLocation(cell='E14'))
+            CellRange.from_string('A1')
+            # CellRange(start=CellLocation(cell='A1'), end=CellLocation(cell='A1'))
+            ```
         """
         if ':' in range_str:
             start_str, end_str = range_str.split(':')
@@ -96,8 +82,10 @@ class CellRange:
             CellRange instance.
 
         Example:
-            >>> CellRange.from_bounds(3, 1, 13, 4)  # B4:E14
-            CellRange(start=CellLocation(cell='B4'), end=CellLocation(cell='E14'))
+            ```python
+            CellRange.from_bounds(3, 1, 13, 4)  # B4:E14
+            # CellRange(start=CellLocation(cell='B4'), end=CellLocation(cell='E14'))
+            ```
         """
         start_col_letter = column_index_to_letter(start_col)
         end_col_letter = column_index_to_letter(end_col)
@@ -195,13 +183,12 @@ class CellRange:
             True if the item is fully within this range.
 
         Example:
-            >>> outer = CellRange.from_string('B4:E14')
-            >>> CellLocation(cell='C5') in outer
-            True
-            >>> CellRange.from_string('C5:D10') in outer
-            True
-            >>> CellRange.from_string('A1:C5') in outer
-            False
+            ```python
+            outer = CellRange.from_string('B4:E14')
+            CellLocation(cell='C5') in outer           # True
+            CellRange.from_string('C5:D10') in outer   # True
+            CellRange.from_string('A1:C5') in outer    # False
+            ```
         """
         if isinstance(item, CellRange):
             return (

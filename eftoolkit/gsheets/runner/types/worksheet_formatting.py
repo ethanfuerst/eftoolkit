@@ -32,14 +32,17 @@ class WorksheetFormatting:
         format_dict: Inline format configuration dictionary for cell formatting.
 
     Example:
-        >>> from eftoolkit.gsheets.types import CellLocation, CellRange
-        >>> formatting = WorksheetFormatting(
-        ...     freeze_rows=1,
-        ...     auto_resize_columns=(0, 5),
-        ...     format_dict={'header_color': '#4a86e8'},
-        ...     notes={CellLocation(cell='A1'): 'Last updated: 2024-01-15'},
-        ...     merge_ranges=[CellRange.from_string('A1:C1')],
-        ... )
+        ```python
+        from eftoolkit.gsheets.types import CellLocation, CellRange
+
+        formatting = WorksheetFormatting(
+            freeze_rows=1,
+            auto_resize_columns=(0, 5),
+            format_dict={'header_color': '#4a86e8'},
+            notes={CellLocation(cell='A1'): 'Last updated: 2024-01-15'},
+            merge_ranges=[CellRange.from_string('A1:C1')],
+        )
+        ```
     """
 
     merge_ranges: list[RangeType] = field(default_factory=list)
