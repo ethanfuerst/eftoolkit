@@ -72,6 +72,37 @@ with ss.worksheet('Sheet1') as ws:
     values = ws.read_range(CellRange.from_string('A1:C10'))  # Same, via CellRange
 ```
 
+#### Header-less sheets and non-row-1 headers
+
+`read()` accepts a 1-based `header_row` kwarg:
+
+```python
+with ss.worksheet('Sheet1') as ws:
+    # Header on row 3 — rows 1 and 2 are skipped
+    df = ws.read(header_row=3)
+
+    # No header — columns default to 0, 1, 2, ...
+    df = ws.read(header_row=None)
+```
+
+!!! note "1-based, not 0-based"
+    `header_row` uses 1-based row numbering to match spreadsheet A1 notation,
+    unlike `pandas.read_csv`'s 0-based `header` kwarg.
+
+#### Type coercion
+
+`gspread.get_all_values()` returns every cell as a string. Pass a `dtype` to
+coerce columns after construction (delegates to `DataFrame.astype`):
+
+```python
+with ss.worksheet('Sheet1') as ws:
+    df = ws.read(dtype=float)                                         # Every column
+    df = ws.read(dtype={'amount': float, 'date': 'datetime64[ns]'})   # Per column
+```
+
+Coercion errors surface as-is from pandas — blank cells (`''`) will raise on
+`int` coercion. Pre-clean with `df.replace('', pd.NA)` if needed.
+
 !!! note "Read methods raise in local preview"
     `read`, `read_cell`, and `read_range` all raise `NotImplementedError` in `local_preview=True` mode. There is no fake-data path.
 

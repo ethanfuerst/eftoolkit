@@ -150,6 +150,107 @@ def test_worksheet_read_raises_in_preview_mode():
         ws.read()
 
 
+def test_worksheet_read_header_row_none_uses_integer_columns():
+    """read(header_row=None) treats every row as data and uses integer columns."""
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [['a', 'b'], ['c', 'd']]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    result = ws.read(header_row=None)
+
+    assert list(result.columns) == [0, 1]
+    assert len(result) == 2
+    assert result.iloc[0].tolist() == ['a', 'b']
+
+
+def test_worksheet_read_header_row_skips_preceding_rows():
+    """read(header_row=2) uses row 2 as header and drops row 1."""
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [
+        ['title row'],
+        ['a', 'b'],
+        ['1', '2'],
+        ['3', '4'],
+    ]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    result = ws.read(header_row=2)
+
+    assert list(result.columns) == ['a', 'b']
+    assert len(result) == 2
+    assert result.iloc[0].tolist() == ['1', '2']
+
+
+def test_worksheet_read_header_row_zero_raises():
+    """read(header_row=0) raises ValueError."""
+    mock_ws = MagicMock()
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    with pytest.raises(ValueError, match='header_row must be >= 1 or None'):
+        ws.read(header_row=0)
+
+
+def test_worksheet_read_header_row_negative_raises():
+    """read(header_row=-1) raises ValueError."""
+    mock_ws = MagicMock()
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    with pytest.raises(ValueError, match='header_row must be >= 1 or None'):
+        ws.read(header_row=-1)
+
+
+def test_worksheet_read_dtype_applies_to_all_columns():
+    """read(dtype=float) coerces every column."""
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [['a', 'b'], ['1', '2'], ['3', '4']]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    result = ws.read(dtype=float)
+
+    assert result['a'].dtype == float
+    assert result['b'].dtype == float
+    assert result['a'].tolist() == [1.0, 3.0]
+
+
+def test_worksheet_read_dtype_applies_per_column():
+    """read(dtype={...}) coerces specified columns only."""
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [
+        ['amount', 'label'],
+        ['10', 'x'],
+        ['20', 'y'],
+    ]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    result = ws.read(dtype={'amount': float})
+
+    assert result['amount'].dtype == float
+    assert result['amount'].tolist() == [10.0, 20.0]
+    assert result['label'].tolist() == ['x', 'y']
+
+
+def test_worksheet_read_dtype_coercion_error_surfaces():
+    """read(dtype=int) on a column with blank cells raises from pandas."""
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [['a'], ['1'], ['']]
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ws = Worksheet(mock_ws, ss)
+
+    with pytest.raises(ValueError):
+        ws.read(dtype=int)
+
+
 # --- Title Tests ---
 
 

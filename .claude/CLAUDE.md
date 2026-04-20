@@ -80,3 +80,6 @@ from eftoolkit.utils import setup_logging
 - **Pre-commit with ruff**: Uses ruff for linting and formatting.
 - **S3FileSystem**: Uses `boto3`. Requires credentials (explicit args or env vars).
 - **Spreadsheet**: Has local preview mode (`local_preview=True`) for development without API calls.
+- **Row/column indexing on `Worksheet`**: User-facing integer row/col params are **1-based** (`insert_rows`, `delete_rows`, `insert_columns`, `delete_columns`, `set_column_width(int)`, `auto_resize_columns`, `Worksheet.read(header_row=...)`). Outlier: `sort_range`'s sort-spec `'column'` key is 0-based. Internal types (`CellLocation.row`, `CellRange.start_row`) are 0-indexed and expose `*_1indexed` siblings for the Sheets API.
+- **Read methods don't retry**: `Worksheet.read_cell` / `read_range` call `gspread` directly and bypass `_execute_with_retry` (unlike every write handler). A 429 on a read fails immediately.
+- **`gspread.get_all_values()` returns all strings**: every cell value is `str`. `Worksheet.read()` accepts a `dtype` kwarg (scalar or per-column dict) that delegates to `DataFrame.astype` after construction.

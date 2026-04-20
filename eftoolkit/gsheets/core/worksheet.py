@@ -78,15 +78,73 @@ class Worksheet:
         """True if running in local preview mode."""
         return self._local_preview
 
-    def read(self) -> pd.DataFrame:
-        """Read worksheet to DataFrame (first row = headers)."""
+    def read(
+        self,
+        header_row: int | None = 1,
+        dtype: type | dict[str, type] | None = None,
+    ) -> pd.DataFrame:
+        """Read worksheet contents into a DataFrame.
+
+        Args:
+            header_row: 1-based row index to treat as the column header.
+                `1` (default) — row 1 is the header; remaining rows are data.
+                `None` — no header; columns default to `0, 1, 2, ...` and all
+                rows are data. `N > 1` — skip the first `N-1` rows and treat
+                row N as the header.
+            dtype: Type to coerce every column (e.g., `float`) or a per-column
+                dict (e.g., `{'amount': float}`). Applied via
+                `DataFrame.astype(dtype)` after construction. Coercion errors
+                surface as-is from pandas (no silent `errors='coerce'`). All
+                values returned by `gspread.get_all_values()` are strings, so
+                expect to coerce numeric / datetime columns.
+
+        Returns:
+            A DataFrame of the sheet's current contents.
+
+        Raises:
+            NotImplementedError: If the worksheet is in `local_preview` mode.
+            ValueError: If `header_row` is not None and is < 1.
+
+        Example:
+            ```python
+            # Default — row 1 is the header
+            df = ws.read()
+
+            # Header-less sheet — integer column labels
+            df = ws.read(header_row=None)
+
+            # Header on row 3 — rows 1 and 2 skipped
+            df = ws.read(header_row=3)
+
+            # Coerce columns (gspread returns every cell as a string)
+            df = ws.read(dtype={'amount': float, 'date': 'datetime64[ns]'})
+            ```
+
+        Note:
+            `header_row` is 1-based to match spreadsheet row numbering —
+            this differs from `pandas.read_csv`'s 0-based `header` kwarg.
+        """
         if self._local_preview:
             raise NotImplementedError('read not available in local preview mode')
+
+        if header_row is not None and header_row < 1:
+            raise ValueError(f'header_row must be >= 1 or None, got {header_row}')
 
         all_values = self._ws.get_all_values()
         if not all_values:
             return pd.DataFrame()
-        return pd.DataFrame(data=all_values[1:], columns=all_values[0])
+
+        if header_row is None:
+            df = pd.DataFrame(data=all_values)
+        else:
+            header = all_values[header_row - 1]
+            data = all_values[header_row:]
+            df = pd.DataFrame(data=data, columns=header)
+
+        if dtype is not None:
+            df = df.astype(dtype)
+
+        return df
 
     def read_cell(self, cell: CellType) -> Any:
         """Read value of a single cell.
