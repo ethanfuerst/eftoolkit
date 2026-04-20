@@ -235,8 +235,8 @@ def test_worksheet_read_dtype_applies_per_column():
     result = ws.read(dtype={'amount': float})
 
     assert result['amount'].dtype == float
-    assert result['label'].dtype == object
     assert result['amount'].tolist() == [10.0, 20.0]
+    assert result['label'].tolist() == ['x', 'y']
 
 
 def test_worksheet_read_dtype_coercion_error_surfaces():
