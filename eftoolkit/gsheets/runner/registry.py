@@ -44,13 +44,14 @@ class WorksheetRegistry:
     Use `clear()` in tests to reset state between test cases.
 
     Example:
-        >>> WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
-        >>> worksheets = WorksheetRegistry.get_ordered_worksheets()
-        >>> len(worksheets)
-        3
+        ```python
+        WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
+        worksheets = WorksheetRegistry.get_ordered_worksheets()
+        len(worksheets)  # 3
 
         # Or register one at a time:
-        >>> WorksheetRegistry.register(SummaryWorksheet())
+        WorksheetRegistry.register(SummaryWorksheet())
+        ```
     """
 
     _worksheets: dict[str, WorksheetDefinition] = {}
@@ -73,8 +74,10 @@ class WorksheetRegistry:
             ValueError: If a worksheet with the same name is already registered.
 
         Example:
-            >>> WorksheetRegistry.register(SummaryWorksheet())
-            >>> WorksheetRegistry.register([Revenue(), Expenses()])
+            ```python
+            WorksheetRegistry.register(SummaryWorksheet())
+            WorksheetRegistry.register([Revenue(), Expenses()])
+            ```
         """
         worksheet_list = worksheets if isinstance(worksheets, list) else [worksheets]
         with cls._lock:
@@ -96,9 +99,11 @@ class WorksheetRegistry:
             respecting any reordering done via `reorder()`.
 
         Example:
-            >>> worksheets = WorksheetRegistry.get_ordered_worksheets()
-            >>> for ws in worksheets:
-            ...     print(ws.name)
+            ```python
+            worksheets = WorksheetRegistry.get_ordered_worksheets()
+            for ws in worksheets:
+                print(ws.name)
+            ```
         """
         with cls._lock:
             return [cls._worksheets[name] for name in cls._order]
@@ -114,9 +119,11 @@ class WorksheetRegistry:
             The worksheet definition if found, None otherwise.
 
         Example:
-            >>> revenue = WorksheetRegistry.get_worksheet('Revenue')
-            >>> if revenue:
-            ...     assets = revenue.generate(config, context)
+            ```python
+            revenue = WorksheetRegistry.get_worksheet('Revenue')
+            if revenue:
+                assets = revenue.generate(config, context)
+            ```
         """
         with cls._lock:
             return cls._worksheets.get(name)
@@ -136,10 +143,11 @@ class WorksheetRegistry:
                 (missing names, extra names, or duplicates).
 
         Example:
-            >>> WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
-            >>> WorksheetRegistry.reorder(["Expenses", "Summary", "Revenue"])
-            >>> WorksheetRegistry.get_ordered_worksheets()[0].name
-            "Expenses"
+            ```python
+            WorksheetRegistry.register([Summary(), Revenue(), Expenses()])
+            WorksheetRegistry.reorder(['Expenses', 'Summary', 'Revenue'])
+            WorksheetRegistry.get_ordered_worksheets()[0].name  # 'Expenses'
+            ```
         """
         with cls._lock:
             registered = set(cls._worksheets.keys())
@@ -166,9 +174,10 @@ class WorksheetRegistry:
         the registry state between test cases.
 
         Example:
-            >>> WorksheetRegistry.clear()
-            >>> len(WorksheetRegistry.get_ordered_worksheets())
-            0
+            ```python
+            WorksheetRegistry.clear()
+            len(WorksheetRegistry.get_ordered_worksheets())  # 0
+            ```
         """
         with cls._lock:
             cls._worksheets = {}

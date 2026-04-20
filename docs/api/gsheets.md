@@ -4,10 +4,9 @@ Google Sheets client with automatic batching and dashboard orchestration.
 
 ## Core Classes
 
-### Spreadsheet
-
 ::: eftoolkit.gsheets.core.spreadsheet.Spreadsheet
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
       members:
@@ -17,17 +16,20 @@ Google Sheets client with automatic batching and dashboard orchestration.
         - create_worksheet
         - delete_worksheet
         - reorder_worksheets
+        - apply_formatting
+        - open_all_previews
         - is_local_preview
-
-### Worksheet
 
 ::: eftoolkit.gsheets.core.worksheet.Worksheet
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
       members:
         - __init__
         - read
+        - read_cell
+        - read_range
         - write_dataframe
         - write_values
         - format_range
@@ -70,20 +72,18 @@ from eftoolkit.gsheets.runner import (
 )
 ```
 
-### DashboardRunner
-
 ::: eftoolkit.gsheets.runner.dashboard_runner.DashboardRunner
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
       members:
         - __init__
         - run
 
-### WorksheetRegistry
-
 ::: eftoolkit.gsheets.runner.registry.WorksheetRegistry
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
       members:
@@ -95,38 +95,39 @@ from eftoolkit.gsheets.runner import (
 
 ## Runner Types
 
-### CellLocation
-
 ::: eftoolkit.gsheets.runner.types.cell_location.CellLocation
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
 
-### HookContext
+::: eftoolkit.gsheets.runner.CellRange
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_source: true
 
 ::: eftoolkit.gsheets.runner.types.hook_context.HookContext
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
-
-### WorksheetFormatting
 
 ::: eftoolkit.gsheets.runner.types.worksheet_formatting.WorksheetFormatting
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
-
-### WorksheetAsset
 
 ::: eftoolkit.gsheets.runner.types.worksheet_asset.WorksheetAsset
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
 
-### WorksheetDefinition
-
 ::: eftoolkit.gsheets.runner.types.worksheet_definition.WorksheetDefinition
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
 
@@ -138,16 +139,14 @@ JSON config utilities for loading JSONC files with comment stripping:
 from eftoolkit.gsheets.utils import load_json_config, remove_comments
 ```
 
-### load_json_config
-
 ::: eftoolkit.gsheets.utils.load_json_config
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true
 
-### remove_comments
-
 ::: eftoolkit.gsheets.utils.remove_comments
     options:
+      heading_level: 3
       show_root_heading: true
       show_source: true

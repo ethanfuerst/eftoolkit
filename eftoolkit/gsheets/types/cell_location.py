@@ -12,6 +12,9 @@ class CellLocation:
 
     The worksheet name comes from the WorksheetDefinition.name property,
     so CellLocation only needs the cell address within that worksheet.
+    Computed properties (`row`, `col`, `row_1indexed`, `col_letter`,
+    `value`) are offset-aware and documented on their individual
+    `@property` methods below.
 
     Attributes:
         cell: The base cell address (e.g., 'B4', 'A1').
@@ -20,36 +23,21 @@ class CellLocation:
         offset_cols: Number of columns to offset from the base cell. Positive moves right,
             negative moves left. Defaults to 0.
 
-    Computed Properties:
-        row: 0-indexed row number after applying offset.
-        col: 0-indexed column number after applying offset.
-        row_1indexed: 1-indexed row number for Google Sheets API after applying offset.
-        col_letter: Column letter(s) after applying offset.
-        value: String representation of the cell after applying offsets.
-
     Example:
-        >>> location = CellLocation(cell='B4')
-        >>> location.cell
-        'B4'
-        >>> location.row
-        3
-        >>> location.col
-        1
-        >>> location.row_1indexed
-        4
-        >>> location.col_letter
-        'B'
+        ```python
+        location = CellLocation(cell='B4')
+        location.cell         # 'B4'
+        location.row          # 3
+        location.col          # 1
+        location.row_1indexed # 4
+        location.col_letter   # 'B'
 
-        >>> # With offsets
-        >>> offset_loc = CellLocation(cell='I2', offset_cols=1)
-        >>> offset_loc.value
-        'J2'
-        >>> CellLocation(cell='I2', offset_cols=-1).value
-        'H2'
-        >>> CellLocation(cell='I2', offset_rows=1).value
-        'I3'
-        >>> CellLocation(cell='I2', offset_rows=-1).value
-        'I1'
+        # With offsets
+        CellLocation(cell='I2', offset_cols=1).value   # 'J2'
+        CellLocation(cell='I2', offset_cols=-1).value  # 'H2'
+        CellLocation(cell='I2', offset_rows=1).value   # 'I3'
+        CellLocation(cell='I2', offset_rows=-1).value  # 'I1'
+        ```
     """
 
     cell: str

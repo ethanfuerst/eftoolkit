@@ -24,11 +24,13 @@ class HookContext:
         runner_context: The shared context dictionary from the DashboardRunner.
 
     Example:
-        >>> def my_hook(ctx: HookContext) -> None:
-        ...     # Access the worksheet for additional operations
-        ...     ctx.worksheet.format_range('A1:B10', {'bold': True})
-        ...     # Access the asset's data
-        ...     print(f'Wrote {len(ctx.asset.df)} rows')
+        ```python
+        def my_hook(ctx: HookContext) -> None:
+            # Access the worksheet for additional operations
+            ctx.worksheet.format_range('A1:B10', {'bold': True})
+            # Access the asset's data
+            print(f'Wrote {len(ctx.asset.df)} rows')
+        ```
     """
 
     worksheet: Worksheet

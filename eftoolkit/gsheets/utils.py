@@ -38,14 +38,12 @@ def column_index_to_letter(index: int) -> str:
         Column letter string (e.g., 'A', 'B', 'Z', 'AA', 'AB')
 
     Example:
-        >>> column_index_to_letter(0)
-        'A'
-        >>> column_index_to_letter(25)
-        'Z'
-        >>> column_index_to_letter(26)
-        'AA'
-        >>> column_index_to_letter(27)
-        'AB'
+        ```python
+        column_index_to_letter(0)   # 'A'
+        column_index_to_letter(25)  # 'Z'
+        column_index_to_letter(26)  # 'AA'
+        column_index_to_letter(27)  # 'AB'
+        ```
     """
     result = ''
     index += 1  # Convert to 1-indexed for calculation
@@ -65,14 +63,12 @@ def column_letter_to_index(col_letter: str) -> int:
         0-indexed column number (A=0, B=1, Z=25, AA=26, AB=27, etc.)
 
     Example:
-        >>> column_letter_to_index('A')
-        0
-        >>> column_letter_to_index('Z')
-        25
-        >>> column_letter_to_index('AA')
-        26
-        >>> column_letter_to_index('AB')
-        27
+        ```python
+        column_letter_to_index('A')   # 0
+        column_letter_to_index('Z')   # 25
+        column_letter_to_index('AA')  # 26
+        column_letter_to_index('AB')  # 27
+        ```
     """
     col = 0
     for char in col_letter.upper():
@@ -192,8 +188,10 @@ def load_json_config(path: str | Path, *, strip_comment_keys: bool = False) -> d
         json.JSONDecodeError: If the content is not valid JSON after stripping comments
 
     Example:
-        >>> # Load config with _comment keys stripped
-        >>> config = load_json_config('config.json', strip_comment_keys=True)
+        ```python
+        # Load config with _comment keys stripped
+        config = load_json_config('config.json', strip_comment_keys=True)
+        ```
     """
     path = Path(path)
     content = path.read_text()
@@ -218,13 +216,15 @@ def remove_comments(obj: dict | list) -> dict | list:
         if it's neither a dict nor a list.
 
     Example:
-        >>> config = {
-        ...     '_comment': 'This is a comment',
-        ...     'setting': 'value',
-        ...     'nested': {'_comment': 'Nested comment', 'key': 'value'}
-        ... }
-        >>> remove_comments(config)
-        {'setting': 'value', 'nested': {'key': 'value'}}
+        ```python
+        config = {
+            '_comment': 'This is a comment',
+            'setting': 'value',
+            'nested': {'_comment': 'Nested comment', 'key': 'value'},
+        }
+        remove_comments(config)
+        # {'setting': 'value', 'nested': {'key': 'value'}}
+        ```
     """
     if isinstance(obj, dict):
         return {

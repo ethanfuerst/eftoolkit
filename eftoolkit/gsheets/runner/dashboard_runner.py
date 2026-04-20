@@ -67,16 +67,18 @@ class DashboardRunner:
         results: Dictionary mapping worksheet names to their generated assets.
 
     Example:
-        >>> def reorder_tabs(ss: Spreadsheet) -> None:
-        ...     ss.reorder_worksheets(['Summary', 'Details', 'Reference'])
-        ...
-        >>> runner = DashboardRunner(
-        ...     config={'sheet_name': 'My Report'},
-        ...     credentials=credentials,
-        ...     worksheets=[SummaryWorksheet(), DetailsWorksheet()],
-        ...     post_run_hooks=[reorder_tabs],
-        ... )
-        >>> runner.run()
+        ```python
+        def reorder_tabs(ss: Spreadsheet) -> None:
+            ss.reorder_worksheets(['Summary', 'Details', 'Reference'])
+
+        runner = DashboardRunner(
+            config={'sheet_name': 'My Report'},
+            credentials=credentials,
+            worksheets=[SummaryWorksheet(), DetailsWorksheet()],
+            post_run_hooks=[reorder_tabs],
+        )
+        runner.run()
+        ```
     """
 
     def __init__(

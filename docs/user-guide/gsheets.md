@@ -5,7 +5,7 @@ The `Spreadsheet` and `Worksheet` classes provide efficient Google Sheets operat
 ## Overview
 
 ```python
-from eftoolkit import Spreadsheet
+from eftoolkit.gsheets import Spreadsheet
 
 # Local preview (no credentials)
 ss = Spreadsheet(local_preview=True, spreadsheet_name='My Sheet')
@@ -20,7 +20,7 @@ Test your workflows without API credentials:
 
 ```python
 import pandas as pd
-from eftoolkit import Spreadsheet
+from eftoolkit.gsheets import Spreadsheet
 
 ss = Spreadsheet(local_preview=True, spreadsheet_name='Report')
 
@@ -50,7 +50,7 @@ Preview files are saved to `gsheets_preview/` by default.
 ```python
 import json
 from pathlib import Path
-from eftoolkit import Spreadsheet
+from eftoolkit.gsheets import Spreadsheet
 
 credentials = json.loads(Path('credentials.json').read_text())
 
@@ -66,8 +66,14 @@ ss = Spreadsheet(
 
 ```python
 with ss.worksheet('Sheet1') as ws:
-    df = ws.read()  # Returns DataFrame
+    df = ws.read()                          # Full sheet → DataFrame (row 1 = headers)
+    value = ws.read_cell('B2')              # Single cell → str | int | float | ''
+    values = ws.read_range('A1:C10')        # Range → list[list[Any]]
+    values = ws.read_range(CellRange.from_string('A1:C10'))  # Same, via CellRange
 ```
+
+!!! note "Read methods raise in local preview"
+    `read`, `read_cell`, and `read_range` all raise `NotImplementedError` in `local_preview=True` mode. There is no fake-data path.
 
 ### Write DataFrame
 
@@ -82,15 +88,25 @@ with ss.worksheet('Sheet1') as ws:
     ws.write_dataframe(df, include_header=False)
 ```
 
-### Write Values
+### Write Values and Single Cells
 
 ```python
 with ss.worksheet('Sheet1') as ws:
+    # Range write (auto-prepends '{title}!' if missing)
     ws.write_values('A1:B2', [
         ['Name', 'Score'],
         ['Alice', 95],
     ])
+
+    # Single-cell write — there is no `write_value` method; use write_values with a 1x1 list
+    ws.write_values('A1', [['Hello']])
+
+    # Or write a 1x1 DataFrame without a header
+    ws.write_dataframe(pd.DataFrame([['Hello']]), location='A1', include_header=False)
 ```
+
+!!! warning "`Worksheet.__exit__` does not flush on exception"
+    Exiting a `with ss.worksheet(...) as ws:` block via an exception **silently drops** queued operations. Only clean exits flush. If you need partial writes on error, call `ws.flush()` explicitly inside the `try` block.
 
 ## Formatting
 
@@ -112,6 +128,18 @@ with ss.worksheet('Sheet1') as ws:
     })
 ```
 
+#### `format_range` accepted dict shapes
+
+`format_range` passes the dict straight through to `gspread.Worksheet.format`. gspread accepts **two equivalent shapes**:
+
+- **Top-level gspread keys**: `{'bold': True, 'backgroundColor': ...}`
+- **Sheets-API `userEnteredFormat` keys**: `{'textFormat': {'bold': True}, 'numberFormat': {...}, 'backgroundColor': {...}}`
+
+The fields mask is derived by gspread from which keys are present; eftoolkit does not normalise or validate the dict. The examples above use the Sheets-API shape, which is the recommended form because it mirrors the REST API documentation.
+
+!!! note "`set_notes` is not batched"
+    Despite the plural name, `set_notes` issues one API call per note inside a loop (each call wrapped in the standard retry). For large note dictionaries, expect N round-trips.
+
 ### Borders
 
 ```python
@@ -131,7 +159,7 @@ ws.set_column_width('A', 200)  # By letter
 ws.set_column_width(1, 200)    # By index (1-based)
 
 # Auto-resize
-ws.auto_resize_columns(1, 5)  # Columns A-E
+ws.auto_resize_columns(1, 5)  # Columns A-E (1-based inclusive range)
 ```
 
 ### Freeze Rows/Columns
@@ -311,14 +339,18 @@ ss = Spreadsheet(
 
 ## Dashboard Runner
 
-For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 6-phase workflow:
+For complex dashboards with multiple worksheets, `DashboardRunner` provides a structured 7-phase workflow:
 
-0. **Run pre-run hooks** - Optional setup operations (create/delete/reorder worksheets)
-1. **Validate structure** - Check spreadsheet access and permissions
-2. **Generate data** - Create all DataFrames (no API calls)
-3. **Write data and run hooks** - Write DataFrames to worksheets and execute post-write hooks
-4. **Apply formatting** - Apply worksheet-level formatting
-5. **Log summary** - Report what was written
+0. **Run pre-run hooks** — optional setup (create/delete/reorder worksheets). Skipped in `local_preview` mode.
+1. **Validate structure** — open the spreadsheet to confirm access and credentials. Skipped in `local_preview` mode.
+2. **Generate data** — call `generate(config, context)` on each definition. Pure Python, no API calls. `context[<worksheet_name>]` is seeded with `{'assets', 'total_rows', 'asset_count'}` after each call so later worksheets can reference earlier ones.
+3. **Write data and run post-write hooks** — inside one `Spreadsheet` context, call `create_worksheet(name, replace=True)` for each definition, write each `WorksheetAsset.df` via `write_dataframe`, then run each asset's `post_write_hooks` with a `HookContext`.
+4. **Apply formatting** — call `get_formatting(context)` on each definition; merge `format_config_path` JSON with inline `format_dict`; apply via `Spreadsheet.apply_formatting`.
+5. **Log summary** — INFO logs per-worksheet asset/row counts and totals.
+6. **Run post-run hooks** — optional cleanup / notifications / reordering. Skipped in `local_preview` mode.
+
+!!! warning "Phase 3 replaces existing tabs"
+    Phase 3 calls `create_worksheet(name, replace=True)`, which **deletes any existing tab with the same name** before writing. Hand-maintained tabs whose names collide with a `WorksheetDefinition.name` will be lost. Rename the tab or the definition to avoid this.
 
 ### Basic Usage
 
@@ -355,6 +387,27 @@ runner = DashboardRunner(
 )
 runner.run()
 ```
+
+### Worksheet Definition Protocol
+
+A worksheet definition is any object that satisfies this `runtime_checkable` `Protocol`:
+
+```python
+from eftoolkit.gsheets.runner import WorksheetAsset, WorksheetFormatting
+
+class WorksheetDefinition(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    def generate(self, config: dict, context: dict) -> list[WorksheetAsset]: ...
+
+    def get_formatting(self, context: dict) -> WorksheetFormatting | None: ...
+```
+
+- `name` is a `@property` returning the tab name. A plain attribute also satisfies `isinstance(obj, WorksheetDefinition)` at runtime, but the documented contract is a property.
+- `generate(config, context)` takes **both** as positional arguments. `config` is passed per call, not stored as `self.config`. `context` is shared state that `DashboardRunner` seeds after every generate call (see Phase 2).
+- `get_formatting(context)` may return `None` to skip Phase 4 for that worksheet.
+- **There are no `setup`, `teardown`, or `validate` lifecycle hooks.** For pre/post orchestration use `pre_run_hooks` / `post_run_hooks` on `DashboardRunner`, and for per-asset side effects use `post_write_hooks` on `WorksheetAsset`.
 
 ### Multiple DataFrames per Worksheet
 
@@ -445,23 +498,45 @@ class FormattedWorksheet:
         )
 ```
 
+### Worksheet Assets
+
+`WorksheetAsset` pairs a DataFrame with a location and optional post-write callbacks:
+
+```python
+from eftoolkit.gsheets.runner import CellLocation, WorksheetAsset
+
+asset = WorksheetAsset(
+    df=my_dataframe,                    # note: field is `df`, not `dataframe`
+    location=CellLocation(cell='A1'),
+    post_write_hooks=[my_hook],         # always a list[Callable[[HookContext], None]]
+)
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `df` | `pd.DataFrame` | Required. The data to write. Field name is `df`. |
+| `location` | `CellLocation` | Required. Top-left cell (header row if `include_header=True`). |
+| `post_write_hooks` | `list[Callable[[HookContext], None]]` | Defaults to empty list. Always a list — never a single callable. |
+
+Hooks run in **Phase 3**, after the asset's data is written via `write_dataframe`, inside the same `Spreadsheet` context. Any queued operations a hook adds flush when the context exits, after the writes. Hooks receive a `HookContext` (not `config`) — to read config, stash it in `context` during `generate()` and pull it back from `ctx.runner_context`.
+
 #### WorksheetFormatting Options
 
 `WorksheetFormatting` supports these options:
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `freeze_rows` | `int \| None` | Number of rows to freeze from the top |
-| `freeze_columns` | `int \| None` | Number of columns to freeze from the left |
-| `auto_resize_columns` | `tuple[int, int] \| None` | (start, end) column indices to auto-resize |
-| `merge_ranges` | `list[str]` | A1-notation ranges to merge (e.g., `['A1:C1']`) |
-| `notes` | `dict[str, str]` | Cell address → note text mapping |
-| `column_widths` | `dict[str \| int, int]` | Column → width in pixels |
-| `borders` | `dict[str, dict]` | Range → border style configuration |
-| `conditional_formats` | `list[dict]` | Conditional formatting rules |
-| `data_validations` | `list[dict]` | Data validation rules |
-| `format_config_path` | `Path \| None` | Path to JSON format config file |
-| `format_dict` | `dict \| None` | Inline format configuration |
+| `freeze_rows` | `int \| None` | Number of rows to freeze from the top. |
+| `freeze_columns` | `int \| None` | Number of columns to freeze from the left. |
+| `auto_resize_columns` | `tuple[int, int] \| None` | **1-based inclusive** (start, end) column indices to auto-resize. |
+| `merge_ranges` | `list[RangeType]` | Ranges to merge. Each item may be an A1 string, a `CellLocation`, or a `CellRange`. |
+| `notes` | `dict[CellType, str]` | Cell → note text. Keys may be A1 strings or `CellLocation`. |
+| `column_widths` | `dict[str \| int, int]` | Column letter or 1-based index → width in pixels. |
+| `borders` | `dict[RangeType, dict]` | Range → border spec passed verbatim to `updateBorders`. |
+| `conditional_formats` | `list[dict]` | Conditional-format rules (see `add_conditional_format`). |
+| `data_validations` | `list[dict]` | Data-validation rules (see `set_data_validation`). |
+| `format_config_path` | `Path \| None` | Path to a JSONC format config file. |
+| `format_dict` | `dict \| None` | Inline format config. Merged with `format_config_path`; `format_dict` wins on collision. |
 
 When both `format_config_path` and `format_dict` are provided, they are merged with `format_dict` taking precedence.
 
@@ -591,26 +666,25 @@ def log_range_info(ctx: HookContext) -> None:
 
 #### CellLocation Properties
 
-`CellLocation` provides computed properties for easy access to row and column indices without manual parsing:
+`CellLocation(cell='B4', offset_rows=0, offset_cols=0)` is a frozen dataclass with computed properties for row/column indices.
 
-| Property | Type | Description | Example (`'B4'`) |
-|----------|------|-------------|------------------|
-| `row` | `int` | 0-indexed row number | `3` |
-| `col` | `int` | 0-indexed column number | `1` |
-| `row_1indexed` | `int` | 1-indexed row number (for Google Sheets API) | `4` |
-| `col_letter` | `str` | Column letter(s) | `'B'` |
-| `value` | `str` | String representation (same as `str()`) | `'B4'` |
+| Property | Type | Description | Example (`CellLocation('B4', offset_cols=1)`) |
+|----------|------|-------------|-----------------------------------------------|
+| `cell` | `str` | **Raw input string, offset NOT applied.** | `'B4'` |
+| `value` | `str` | **Offset-aware A1 address.** Same as `str(loc)`. Use this for API calls. | `'C4'` |
+| `row` | `int` | 0-indexed row (offset-aware). | `3` |
+| `col` | `int` | 0-indexed column (offset-aware). | `2` |
+| `row_1indexed` | `int` | 1-indexed row (offset-aware). | `4` |
+| `col_letter` | `str` | Column letter(s) (offset-aware). | `'C'` |
 
-Example usage:
+!!! warning "`.cell` vs `.value`"
+    `.cell` is the raw input string you passed in — offsets are not applied. `.value` (and `str(loc)`) apply offsets and return the resolved A1 address. Always use `.value` when passing to range APIs. Mixing them up is the most common bug with this type.
 
 ```python
-location = CellLocation(cell='AA10')
-location.row          # 9 (0-indexed)
-location.col          # 26 (0-indexed, AA = 26)
-location.row_1indexed # 10 (1-indexed)
-location.col_letter   # 'AA'
-location.value        # 'AA10'
-str(location)         # 'AA10'
+loc = CellLocation(cell='I2', offset_cols=1)
+loc.cell    # 'I2'  — raw input
+loc.value   # 'J2'  — offset applied; use this for API calls
+str(loc)    # 'J2'  — same as .value
 ```
 
 #### CellRange Type

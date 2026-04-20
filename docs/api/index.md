@@ -11,24 +11,22 @@ Complete API documentation for all eftoolkit modules.
 | [`eftoolkit.gsheets`](gsheets.md) | Spreadsheet and Worksheet classes |
 | [`eftoolkit.config`](config.md) | Configuration utilities |
 
-## Top-Level Exports
+## Imports
 
-The following are available directly from `eftoolkit`:
+`eftoolkit/__init__.py` exposes `__version__` only. Import classes and helpers from their submodules:
 
 ```python
-from eftoolkit import (
-    DuckDB,
-    S3FileSystem,
-    Spreadsheet,
-    Worksheet,
-    load_json_config,
-    setup_logging,
-)
+from eftoolkit import __version__
+from eftoolkit.sql import DuckDB
+from eftoolkit.s3 import S3FileSystem
+from eftoolkit.gsheets import Spreadsheet, Worksheet
+from eftoolkit.gsheets.utils import load_json_config
+from eftoolkit.utils import setup_logging
 ```
 
 ## Package Info
 
 ```python
 import eftoolkit
-print(eftoolkit.__version__)  # e.g., '0.1.0'
+print(eftoolkit.__version__)  # e.g., '2.6.1'
 ```

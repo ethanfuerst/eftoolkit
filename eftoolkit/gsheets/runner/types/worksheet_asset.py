@@ -26,35 +26,29 @@ class WorksheetAsset:
     A WorksheetDefinition.generate() returns a list of WorksheetAssets, allowing
     multiple DataFrames to be written to different locations on the same worksheet.
 
+    Computed properties (`header_range`, `data_range`, `full_range`,
+    `column_ranges`, `data_column_ranges`, `num_rows`, `num_cols`,
+    `start_row`, `end_row`, `start_col`, `end_col`) are documented on their
+    individual `@property` methods below.
+
     Attributes:
         df: The DataFrame to write to the sheet.
         location: Where to write the DataFrame within the worksheet.
         post_write_hooks: Callables that receive a HookContext and run after writing.
             The HookContext provides access to the worksheet, asset, and runner context.
 
-    Computed Properties:
-        header_range: CellRange for the header row (e.g., 'B4:E4').
-        data_range: CellRange for data rows excluding header (e.g., 'B5:E14').
-        full_range: CellRange for header + data (e.g., 'B4:E14').
-        column_ranges: Dict mapping column name to CellRange including header.
-        data_column_ranges: Dict mapping column name to data-only CellRange.
-        num_rows: Number of data rows (excluding header).
-        num_cols: Number of columns.
-        start_row: 1-based row index of the header row.
-        end_row: 1-based row index of the last data row.
-        start_col: Letter of the first column.
-        end_col: Letter of the last column.
-
     Example:
-        >>> def my_hook(ctx: HookContext) -> None:
-        ...     # Use computed ranges for formatting (use .value for API calls)
-        ...     ctx.worksheet.format_range(ctx.asset.header_range.value, {'bold': True})
-        ...
-        >>> asset = WorksheetAsset(
-        ...     df=my_dataframe,
-        ...     location=CellLocation(cell='B4'),
-        ...     post_write_hooks=[my_hook],
-        ... )
+        ```python
+        def my_hook(ctx: HookContext) -> None:
+            # Use computed ranges for formatting (use .value for API calls)
+            ctx.worksheet.format_range(ctx.asset.header_range.value, {'bold': True})
+
+        asset = WorksheetAsset(
+            df=my_dataframe,
+            location=CellLocation(cell='B4'),
+            post_write_hooks=[my_hook],
+        )
+        ```
     """
 
     df: DataFrame

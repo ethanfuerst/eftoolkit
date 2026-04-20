@@ -7,3 +7,12 @@ Submodules:
     - eftoolkit.gsheets.runner: Dashboard workflow orchestrator
     - eftoolkit.utils: General utilities (logging setup)
 """
+
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version('eftoolkit')
+except PackageNotFoundError:
+    __version__ = '0.0.0+unknown'
+
+__all__ = ['__version__']
