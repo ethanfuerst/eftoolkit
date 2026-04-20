@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Core Types: CellLocation, WorksheetAsset, WorksheetDefinition (#23)
 - WorksheetRegistry: Registry for worksheet definitions (#24)
+- `Worksheet.read()` now accepts `header_row` (1-based; `None` for header-less) and `dtype` (scalar or per-column dict) kwargs (ETH-425)
 
 ## [0.3.9] - 2026-01-17
 
