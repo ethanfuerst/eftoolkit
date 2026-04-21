@@ -62,7 +62,12 @@ def test_import_setup_logging_from_utils():
 
 def test_import_json_config_from_gsheets_utils():
     """Test: from eftoolkit.gsheets.utils import load_json_config, etc."""
-    from eftoolkit.gsheets.utils import load_json_config, remove_comments
+    from eftoolkit.gsheets.utils import (
+        load_json_config,
+        load_service_account_credentials,
+        remove_comments,
+    )
 
     assert load_json_config is not None
+    assert load_service_account_credentials is not None
     assert remove_comments is not None

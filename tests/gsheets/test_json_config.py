@@ -343,3 +343,86 @@ def test_load_json_config_strip_comment_keys_explicit_false(tmp_path):
     result = load_json_config(config_file, strip_comment_keys=False)
 
     assert result == {'_comment': 'preserved', 'key': 'value'}
+
+
+def test_load_json_config_requires_path_or_env():
+    """load_json_config raises when neither path nor env is provided."""
+    with pytest.raises(ValueError, match="exactly one of 'path' or 'env'"):
+        load_json_config()
+
+
+def test_load_json_config_rejects_both_path_and_env(tmp_path, monkeypatch):
+    """load_json_config raises when both path and env are provided."""
+    config_file = tmp_path / 'config.json'
+    config_file.write_text('{"key": "value"}')
+    monkeypatch.setenv('TEST_JSON', '{"key": "other"}')
+
+    with pytest.raises(ValueError, match="exactly one of 'path' or 'env'"):
+        load_json_config(config_file, env='TEST_JSON')
+
+
+def test_load_json_config_from_env(monkeypatch):
+    """load_json_config reads from an environment variable."""
+    monkeypatch.setenv('TEST_JSON', '{"key": "value", "number": 42}')
+
+    result = load_json_config(env='TEST_JSON')
+
+    assert result == {'key': 'value', 'number': 42}
+
+
+def test_load_json_config_from_env_with_multiline_value(monkeypatch):
+    """load_json_config fixes literal newlines in env-var JSON values."""
+    # Service-account-style JSON where the private_key field contains real LFs
+    raw = '{"private_key": "-----BEGIN-----\nLINE1\nLINE2\n-----END-----\n"}'
+    monkeypatch.setenv('TEST_JSON', raw)
+
+    result = load_json_config(env='TEST_JSON')
+
+    assert result == {'private_key': '-----BEGIN-----\nLINE1\nLINE2\n-----END-----\n'}
+
+
+def test_load_json_config_from_env_idempotent_on_escaped_newlines(monkeypatch):
+    """load_json_config leaves already-escaped \\n sequences unchanged."""
+    # This is what `export VAR="$(cat creds.json)"` typically produces:
+    # real backslash + n (2 chars), no literal LF
+    raw = r'{"private_key": "-----BEGIN-----\nLINE1\n-----END-----"}'
+    monkeypatch.setenv('TEST_JSON', raw)
+
+    result = load_json_config(env='TEST_JSON')
+
+    assert result == {'private_key': '-----BEGIN-----\nLINE1\n-----END-----'}
+
+
+def test_load_json_config_env_unset_raises(monkeypatch):
+    """load_json_config raises when env var is unset."""
+    monkeypatch.delenv('MISSING_ENV', raising=False)
+
+    with pytest.raises(ValueError, match="'MISSING_ENV' is not set or empty"):
+        load_json_config(env='MISSING_ENV')
+
+
+def test_load_json_config_env_empty_raises(monkeypatch):
+    """load_json_config raises when env var is an empty string."""
+    monkeypatch.setenv('EMPTY_ENV', '')
+
+    with pytest.raises(ValueError, match="'EMPTY_ENV' is not set or empty"):
+        load_json_config(env='EMPTY_ENV')
+
+
+def test_load_json_config_env_error_does_not_leak_value(monkeypatch):
+    """load_json_config error message does not include env var contents."""
+    monkeypatch.setenv('SECRET_ENV', 'supersecret-private-key')
+    # Trigger a JSON parse error, not a missing-var error
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        load_json_config(env='SECRET_ENV')
+
+    assert 'supersecret-private-key' not in str(exc_info.value)
+
+
+def test_load_json_config_from_env_with_strip_comment_keys(monkeypatch):
+    """load_json_config(env=...) respects strip_comment_keys."""
+    monkeypatch.setenv('TEST_JSON', '{"_comment": "doc", "key": "value"}')
+
+    result = load_json_config(env='TEST_JSON', strip_comment_keys=True)
+
+    assert result == {'key': 'value'}

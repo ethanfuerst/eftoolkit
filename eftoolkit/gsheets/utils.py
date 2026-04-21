@@ -1,12 +1,20 @@
 """Utility functions for Google Sheets operations."""
 
 import json
+import os
 import re
 from collections.abc import Callable
 from pathlib import Path
 
+from google.oauth2.service_account import Credentials
+
 # Registry for batch request handlers. Starts empty; populated at import time
 BATCH_HANDLERS: dict[str, str] = {}
+
+_DEFAULT_SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive',
+]
 
 
 def batch_handler(req_type: str) -> Callable:
@@ -167,39 +175,82 @@ def _strip_comments(content: str) -> str:
     return '\n'.join(result_lines)
 
 
-def load_json_config(path: str | Path, *, strip_comment_keys: bool = False) -> dict:
-    """Load a JSON config file, stripping JSONC-style comments.
+def load_json_config(
+    path: str | Path | None = None,
+    *,
+    env: str | None = None,
+    strip_comment_keys: bool = False,
+) -> dict:
+    """Load a JSON config from a file or environment variable.
 
-    Supports:
-    - Standard JSON files
-    - JSONC files with // single-line comments
-    - JSONC files with /* */ block comments
+    Exactly one of `path` or `env` must be provided. File-based loading
+    supports JSONC (// and /* */ comments). Env-var loading additionally
+    fixes up literal newlines inside the string so multi-line values
+    (e.g. Google service account private keys) parse correctly.
 
     Args:
-        path: Path to the JSON/JSONC file
-        strip_comment_keys: If True, also remove keys starting with '_comment'
-            from the loaded config using remove_comments(). Default: False.
+        path: Path to a JSON/JSONC file. Mutually exclusive with `env`.
+        env: Name of an environment variable holding a JSON string.
+            Mutually exclusive with `path`.
+        strip_comment_keys: If True, recursively remove keys starting
+            with '_comment' from the parsed result.
 
     Returns:
-        Parsed JSON as a dictionary
+        Parsed JSON as a dictionary.
 
     Raises:
-        FileNotFoundError: If the file does not exist
-        json.JSONDecodeError: If the content is not valid JSON after stripping comments
+        ValueError: If neither or both of `path` and `env` are provided,
+            or if the env var is unset or empty.
+        FileNotFoundError: If `path` is provided but the file does not exist.
+        json.JSONDecodeError: If the content is not valid JSON.
 
     Example:
         ```python
-        # Load config with _comment keys stripped
-        config = load_json_config('config.json', strip_comment_keys=True)
+        # From a file (existing behavior)
+        config = load_json_config('config.jsonc')
+
+        # From an env var (e.g. Google service account JSON)
+        creds = load_json_config(env='GSPREAD_CREDENTIALS')
         ```
     """
-    path = Path(path)
-    content = path.read_text()
+    if (path is None) == (env is None):
+        raise ValueError("Provide exactly one of 'path' or 'env'")
+
+    if env is not None:
+        content = _load_env_var_json(env)
+    else:
+        content = Path(path).read_text()
+
     stripped = _strip_comments(content)
     result = json.loads(stripped)
     if strip_comment_keys:
         result = remove_comments(result)
     return result
+
+
+def _load_env_var_json(env_name: str) -> str:
+    """Read a JSON string from an env var, fixing multi-line private keys.
+
+    Env vars with multi-line values (notably Google service account private
+    keys) often contain literal newlines that break `json.loads`. This helper
+    replaces real newlines with the JSON escape sequence `\\n`. The
+    replacement is idempotent: env vars stored with `\\n` escapes intact
+    are unchanged.
+
+    Args:
+        env_name: Name of the environment variable.
+
+    Returns:
+        The env var's value with newlines escaped, ready for `json.loads`.
+
+    Raises:
+        ValueError: If the env var is unset or empty. The error message
+            does not include the env var's value.
+    """
+    raw = os.getenv(env_name)
+    if not raw:
+        raise ValueError(f'Environment variable {env_name!r} is not set or empty')
+    return raw.replace('\n', '\\n')
 
 
 def remove_comments(obj: dict | list) -> dict | list:
@@ -236,3 +287,43 @@ def remove_comments(obj: dict | list) -> dict | list:
         return [remove_comments(item) for item in obj]
     else:
         return obj
+
+
+def load_service_account_credentials(
+    *,
+    env: str = 'GSPREAD_CREDENTIALS',
+    scopes: list[str] | None = None,
+) -> Credentials:
+    """Load Google service account credentials from an env var.
+
+    Reads the JSON blob from the given env var, fixes up multi-line
+    private-key newlines, and builds a `google.oauth2.service_account.Credentials`
+    object ready to pass to `gspread.authorize` or any other google-auth
+    consumer.
+
+    Args:
+        env: Name of the environment variable holding the service account
+            JSON. Defaults to 'GSPREAD_CREDENTIALS'.
+        scopes: OAuth scopes for the credentials. Defaults to gspread's
+            usual scopes (Sheets + Drive).
+
+    Returns:
+        A configured `Credentials` object.
+
+    Raises:
+        ValueError: If the env var is unset or empty.
+        json.JSONDecodeError: If the env var does not contain valid JSON.
+
+    Example:
+        ```python
+        import gspread
+        from eftoolkit.gsheets.utils import load_service_account_credentials
+
+        creds = load_service_account_credentials(env='GSPREAD_CREDENTIALS')
+        gc = gspread.authorize(creds)
+        ```
+    """
+    info = load_json_config(env=env)
+    return Credentials.from_service_account_info(
+        info, scopes=scopes if scopes is not None else _DEFAULT_SCOPES
+    )
