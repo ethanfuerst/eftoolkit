@@ -136,7 +136,7 @@ with ss.worksheet('Sheet1') as ws:
 ### Load JSON Config (with JSONC support)
 
 ```python
-from eftoolkit import load_json_config
+from eftoolkit.gsheets.utils import load_json_config
 
 # Supports standard JSON and JSONC (with comments)
 config = load_json_config('config.jsonc')

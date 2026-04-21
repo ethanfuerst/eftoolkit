@@ -145,6 +145,12 @@ from eftoolkit.gsheets.utils import load_json_config, remove_comments
       show_root_heading: true
       show_source: true
 
+::: eftoolkit.gsheets.utils.load_service_account_credentials
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_source: true
+
 ::: eftoolkit.gsheets.utils.remove_comments
     options:
       heading_level: 3
