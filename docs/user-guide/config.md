@@ -52,12 +52,24 @@ logging.getLogger('boto3').setLevel(logging.WARNING)
 
 ## JSON Config Loading
 
-For loading JSONC files with comment support, use the gsheets utilities:
+For loading JSONC files with comment support, or JSON blobs stored in an environment variable:
 
 ```python
 from eftoolkit.gsheets.utils import load_json_config, remove_comments
 
+# From a file
 config = load_json_config('config.jsonc')
+
+# From an environment variable (fixes multi-line private-key newlines)
+creds = load_json_config(env='GSPREAD_CREDENTIALS')
+```
+
+For Google service account credentials specifically, use `load_service_account_credentials` to get a `google-auth` credentials object directly:
+
+```python
+from eftoolkit.gsheets.utils import load_service_account_credentials
+
+creds = load_service_account_credentials(env='GSPREAD_CREDENTIALS')
 ```
 
 See the [gsheets documentation](gsheets.md) for more details.

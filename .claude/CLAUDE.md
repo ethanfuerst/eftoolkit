@@ -11,7 +11,7 @@ A personal Python toolkit providing reusable utilities for common tasks. Include
   - `gsheets/runner/` - `DashboardRunner`: 7-phase workflow orchestrator (phases 0–6)
   - `gsheets/runner/registry.py` - `WorksheetRegistry`: worksheet definition registry
   - `gsheets/runner/types/` - Type definitions for dashboard runner
-  - `gsheets/utils.py` - JSON config loading, cell parsing utilities
+  - `gsheets/utils.py` - JSON/JSONC config loading (file or env var), service account credential loading, cell parsing utilities
   - `utils.py` - General utilities (logging setup)
 - `tests/` - pytest test suite
   - `conftest.py` - shared fixtures (sample DataFrames, mock S3)
@@ -50,7 +50,7 @@ from eftoolkit.sql import DuckDB
 from eftoolkit.s3 import S3FileSystem
 from eftoolkit.gsheets import Spreadsheet, Worksheet
 from eftoolkit.gsheets.runner import DashboardRunner, WorksheetRegistry
-from eftoolkit.gsheets.utils import load_json_config, remove_comments
+from eftoolkit.gsheets.utils import load_json_config, load_service_account_credentials, remove_comments
 from eftoolkit.utils import setup_logging
 ```
 
@@ -83,3 +83,4 @@ from eftoolkit.utils import setup_logging
 - **Row/column indexing on `Worksheet`**: User-facing integer row/col params are **1-based** (`insert_rows`, `delete_rows`, `insert_columns`, `delete_columns`, `set_column_width(int)`, `auto_resize_columns`, `Worksheet.read(header_row=...)`). Outlier: `sort_range`'s sort-spec `'column'` key is 0-based. Internal types (`CellLocation.row`, `CellRange.start_row`) are 0-indexed and expose `*_1indexed` siblings for the Sheets API.
 - **Read methods don't retry**: `Worksheet.read_cell` / `read_range` call `gspread` directly and bypass `_execute_with_retry` (unlike every write handler). A 429 on a read fails immediately.
 - **`gspread.get_all_values()` returns all strings**: every cell value is `str`. `Worksheet.read()` accepts a `dtype` kwarg (scalar or per-column dict) that delegates to `DataFrame.astype` after construction.
+- **Env-var credential loading**: `load_json_config(env='GSPREAD_CREDENTIALS')` and `load_service_account_credentials(env=...)` apply an idempotent `\n` → `\\n` fixup on the raw env-var string before `json.loads` so multi-line private keys pasted through UIs still parse. `Spreadsheet.__init__` still takes a dict; env-var integration on that API is tracked in ETH-436.

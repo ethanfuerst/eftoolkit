@@ -60,6 +60,31 @@ ss = Spreadsheet(
 )
 ```
 
+### Connect with credentials in an environment variable
+
+For deployments where credentials are stored as a single env var (Heroku, Render, GitHub Actions secrets, etc.):
+
+```python
+from eftoolkit.gsheets import Spreadsheet
+from eftoolkit.gsheets.utils import load_json_config
+
+# Reads $GSPREAD_CREDENTIALS, handles multi-line private keys automatically
+ss = Spreadsheet(
+    credentials=load_json_config(env='GSPREAD_CREDENTIALS'),
+    spreadsheet_name='Production Report',
+)
+```
+
+If you need a `google-auth` credentials object directly (e.g. for use with `gspread.authorize` or a non-gspread Google API), use `load_service_account_credentials`:
+
+```python
+import gspread
+from eftoolkit.gsheets.utils import load_service_account_credentials
+
+creds = load_service_account_credentials(env='GSPREAD_CREDENTIALS')
+gc = gspread.authorize(creds)
+```
+
 ## Worksheet Operations
 
 ### Read Data
