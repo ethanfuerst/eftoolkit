@@ -84,7 +84,7 @@ def test_s3_property_returns_filesystem(mock_s3_bucket):
     assert isinstance(db.s3, S3FileSystem)
 
 
-def test_s3_property_returns_none_when_not_configured():
+def test_s3_property_returns_none_when_not_configured(clear_s3_env):
     """s3 property returns None when S3 is not configured."""
     db = DuckDB()
 

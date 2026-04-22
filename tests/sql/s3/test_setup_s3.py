@@ -1,5 +1,7 @@
 """Tests for DuckDB _setup_s3 method and credential configuration."""
 
+import os
+
 import pandas as pd
 
 from eftoolkit.s3 import S3FileSystem
@@ -64,7 +66,7 @@ def test_setup_s3_with_url_style(mock_s3_bucket):
     assert db.s3_url_style == 'path'
 
 
-def test_setup_s3_not_called_without_credentials():
+def test_setup_s3_not_called_without_credentials(clear_s3_env):
     """_setup_s3 does nothing when credentials are not provided."""
     db = DuckDB()
 
@@ -72,6 +74,44 @@ def test_setup_s3_not_called_without_credentials():
     result = db.query('SELECT 1 as num')
 
     assert result['num'][0] == 1
+
+
+def test_duckdb_credentials_from_s3_env_vars(clear_s3_env):
+    """DuckDB resolves S3 creds from S3_* env vars and configures a native secret."""
+    os.environ['S3_ACCESS_KEY_ID'] = 'test-key'
+    os.environ['S3_SECRET_ACCESS_KEY'] = 'test-secret'
+    os.environ['S3_REGION'] = 'us-west-2'
+
+    db = DuckDB()
+
+    assert db.s3_access_key_id == 'test-key'
+    assert db.s3_secret_access_key == 'test-secret'
+    assert db.s3_region == 'us-west-2'
+    assert db._s3 is not None
+    assert isinstance(db.s3, S3FileSystem)
+
+    secrets = db.query('SELECT name, type FROM duckdb_secrets()')
+
+    assert len(secrets) >= 1
+    assert (secrets['type'] == 's3').any()
+
+
+def test_duckdb_credentials_from_aws_env_vars(clear_s3_env):
+    """DuckDB falls back to AWS_* env vars when S3_* aren't set."""
+    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
+    os.environ['AWS_REGION'] = 'eu-west-1'
+
+    db = DuckDB()
+
+    assert db.s3_access_key_id == 'aws-key'
+    assert db.s3_secret_access_key == 'aws-secret'
+    assert db.s3_region == 'eu-west-1'
+    assert db._s3 is not None
+
+    secrets = db.query('SELECT name, type FROM duckdb_secrets()')
+
+    assert (secrets['type'] == 's3').any()
 
 
 def test_setup_s3_without_url_style(mock_s3_bucket):

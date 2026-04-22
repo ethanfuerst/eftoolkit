@@ -1,13 +1,12 @@
 """DuckDB wrapper with S3 integration."""
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Optional
 
 import duckdb
 import pandas as pd
 
-if TYPE_CHECKING:
-    from eftoolkit.s3 import S3FileSystem
+from eftoolkit.s3 import S3FileSystem
+from eftoolkit.s3.filesystem import _resolve_s3_credentials
 
 
 class DuckDB:
@@ -23,7 +22,7 @@ class DuckDB:
         self,
         database: str = ':memory:',
         *,
-        s3: Optional['S3FileSystem'] = None,
+        s3: S3FileSystem | None = None,
         s3_region: str | None = None,
         s3_access_key_id: str | None = None,
         s3_secret_access_key: str | None = None,
@@ -37,51 +36,58 @@ class DuckDB:
         :class:`~eftoolkit.s3.S3FileSystem` used by
         :meth:`read_parquet_from_s3` and :meth:`write_df_to_s3_parquet`.
 
-        Unlike :class:`~eftoolkit.s3.S3FileSystem`, ``DuckDB`` does **not**
-        read environment variables. For env-var-driven auth, pass
-        ``s3=S3FileSystem()``. Note that those env-var credentials then
-        apply only to ``read_parquet_from_s3`` / ``write_df_to_s3_parquet``,
-        not to native DuckDB SQL against ``s3://`` URIs (which needs the
-        credentials threaded through the ``s3_*`` kwargs).
+        Each credential field falls back through the same precedence chain
+        as :class:`~eftoolkit.s3.S3FileSystem`: explicit ``s3_*`` kwarg →
+        ``S3_*`` env var → ``AWS_*`` env var (``s3_endpoint`` has no
+        ``AWS_*`` fallback). See :class:`~eftoolkit.s3.S3FileSystem` for
+        the full table.
 
         Args:
             database: DuckDB file path or ``':memory:'`` for an in-memory
                 database. Default: ``':memory:'``.
             s3: Existing :class:`~eftoolkit.s3.S3FileSystem` to reuse. Takes
                 precedence over the ``s3_*`` kwargs. Default: ``None``.
-            s3_region: AWS region. Default: ``None``.
-            s3_access_key_id: S3 access key ID. Default: ``None``.
-            s3_secret_access_key: S3 secret access key. Default: ``None``.
+            s3_region: AWS region. Falls back to ``S3_REGION``, then
+                ``AWS_REGION``. Default: ``None``.
+            s3_access_key_id: S3 access key ID. Falls back to
+                ``S3_ACCESS_KEY_ID``, then ``AWS_ACCESS_KEY_ID``.
+                Default: ``None``.
+            s3_secret_access_key: S3 secret access key. Falls back to
+                ``S3_SECRET_ACCESS_KEY``, then ``AWS_SECRET_ACCESS_KEY``.
+                Default: ``None``.
             s3_endpoint: Custom S3 endpoint (e.g.,
                 ``'nyc3.digitaloceanspaces.com'``) for non-AWS services like
-                DigitalOcean Spaces, Cloudflare R2, or MinIO. Default: ``None``.
+                DigitalOcean Spaces, Cloudflare R2, or MinIO. Falls back to
+                ``S3_ENDPOINT``. Default: ``None``.
             s3_url_style: S3 URL style, ``'path'`` or ``'vhost'``. Emitted as
                 ``SET s3_url_style='<value>'`` on the connection. Not
                 forwarded to the internal ``S3FileSystem`` (``boto3`` uses
-                vhost-style by default). Default: ``None``.
+                vhost-style by default). Does not read from the environment.
+                Default: ``None``.
         """
         self.database = database
         self._s3 = s3
-        self.s3_region = s3_region
-        self.s3_access_key_id = s3_access_key_id
-        self.s3_secret_access_key = s3_secret_access_key
-        self.s3_endpoint = s3_endpoint
+        (
+            self.s3_access_key_id,
+            self.s3_secret_access_key,
+            self.s3_region,
+            self.s3_endpoint,
+        ) = _resolve_s3_credentials(
+            s3_access_key_id, s3_secret_access_key, s3_region, s3_endpoint
+        )
         self.s3_url_style = s3_url_style
         self._active_conn: duckdb.DuckDBPyConnection | None = None
 
-        # Create S3FileSystem from credentials if provided and no s3 instance given
-        if self._s3 is None and s3_access_key_id and s3_secret_access_key:
-            from eftoolkit.s3 import S3FileSystem
-
+        if self._s3 is None and self.s3_access_key_id and self.s3_secret_access_key:
             self._s3 = S3FileSystem(
-                access_key_id=s3_access_key_id,
-                secret_access_key=s3_secret_access_key,
-                region=s3_region,
-                endpoint=s3_endpoint,
+                access_key_id=self.s3_access_key_id,
+                secret_access_key=self.s3_secret_access_key,
+                region=self.s3_region,
+                endpoint=self.s3_endpoint,
             )
 
     @property
-    def s3(self) -> Optional['S3FileSystem']:
+    def s3(self) -> S3FileSystem | None:
         """S3FileSystem instance used for S3 operations, or None if not configured."""
         return self._s3
 

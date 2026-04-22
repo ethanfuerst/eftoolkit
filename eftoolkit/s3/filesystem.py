@@ -121,6 +121,31 @@ def _parse_s3_uri(s3_uri: str) -> tuple[str, str]:
     return bucket, key
 
 
+def _resolve_s3_credentials(
+    access_key_id: str | None,
+    secret_access_key: str | None,
+    region: str | None,
+    endpoint: str | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Resolve S3 credentials with the shared precedence chain.
+
+    For each field, precedence is:
+    explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
+    ``endpoint`` has no ``AWS_*`` fallback.
+
+    Returns a 4-tuple of resolved values, any of which may be ``None`` if
+    neither the kwarg nor the corresponding env var is set. Does not raise
+    — validation is the caller's responsibility.
+    """
+    return (
+        access_key_id or os.getenv('S3_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')),
+        secret_access_key
+        or os.getenv('S3_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')),
+        region or os.getenv('S3_REGION', os.getenv('AWS_REGION')),
+        endpoint or os.getenv('S3_ENDPOINT'),
+    )
+
+
 class S3FileSystem:
     """S3 filesystem client for reading/writing parquet files.
 
@@ -170,14 +195,12 @@ class S3FileSystem:
             ValueError: If no access key and secret can be resolved from
                 either kwargs or environment variables.
         """
-        self.access_key_id = access_key_id or os.getenv(
-            'S3_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')
-        )
-        self.secret_access_key = secret_access_key or os.getenv(
-            'S3_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')
-        )
-        self.region = region or os.getenv('S3_REGION', os.getenv('AWS_REGION'))
-        self.endpoint = endpoint or os.getenv('S3_ENDPOINT')
+        (
+            self.access_key_id,
+            self.secret_access_key,
+            self.region,
+            self.endpoint,
+        ) = _resolve_s3_credentials(access_key_id, secret_access_key, region, endpoint)
 
         if not self.access_key_id or not self.secret_access_key:
             raise ValueError(

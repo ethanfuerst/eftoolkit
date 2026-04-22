@@ -185,24 +185,38 @@ conn.execute("LOAD spatial")
 
 ## Environment Variables
 
-`DuckDB` does not read environment variables. For env-var-driven auth,
-construct an `S3FileSystem` explicitly:
+`DuckDB` falls back to environment variables when the `s3_*` credential
+kwargs are omitted. Per field, precedence is:
+
+**1. explicit `s3_*` kwarg** → **2. `S3_*` env var** → **3. `AWS_*` env var**
+
+| `s3_*` kwarg | `S3_*` (primary) | `AWS_*` (fallback) |
+|--------------|------------------|--------------------|
+| `s3_access_key_id` | `S3_ACCESS_KEY_ID` | `AWS_ACCESS_KEY_ID` |
+| `s3_secret_access_key` | `S3_SECRET_ACCESS_KEY` | `AWS_SECRET_ACCESS_KEY` |
+| `s3_region` | `S3_REGION` | `AWS_REGION` |
+| `s3_endpoint` | `S3_ENDPOINT` | _(no fallback)_ |
+
+Resolved credentials apply to both the internal `S3FileSystem` (used by
+`read_parquet_from_s3` / `write_df_to_s3_parquet`) and the native DuckDB
+S3 layer (`INSTALL httpfs` + `CREATE SECRET`, used by raw `s3://` SQL).
 
 ```python
-from eftoolkit import DuckDB, S3FileSystem
+# All four fields resolved from the environment
+db = DuckDB()
 
-# S3FileSystem reads S3_* / AWS_* env vars
-db = DuckDB(s3=S3FileSystem())
+# Mix: explicit region, env-var credentials
+db = DuckDB(s3_region='eu-west-1')
 ```
 
-!!! warning "Partial coverage"
-    Env-var credentials resolved through the inner `S3FileSystem` apply
-    **only** to `read_parquet_from_s3` / `write_df_to_s3_parquet`. Native
-    DuckDB SQL against `s3://` URIs (via `INSTALL httpfs` + `CREATE SECRET`)
-    needs credentials passed through the `s3_*` kwargs explicitly.
+If neither kwargs nor env vars yield both `s3_access_key_id` and
+`s3_secret_access_key`, `DuckDB` leaves S3 unconfigured — S3-touching
+methods then raise `ValueError('S3 not configured')`.
 
-See the [S3 Operations env-var table](s3.md#environment-variables) for the
-full precedence order.
+!!! note "Not consulted"
+    `AWS_DEFAULT_REGION`, `S3_URL_STYLE`, `AWS_SESSION_TOKEN`, and
+    `AWS_PROFILE` are not read. See the
+    [S3 env-var section](s3.md#environment-variables).
 
 ## See Also
 

@@ -24,7 +24,7 @@ def test_context_manager():
         assert result['answer'][0] == 42
 
 
-def test_s3_not_configured(sample_df):
+def test_s3_not_configured(clear_s3_env, sample_df):
     """Test S3 methods raise when not configured."""
     db = DuckDB(database=':memory:')
 
