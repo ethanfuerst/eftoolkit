@@ -46,6 +46,7 @@ nav:
       - S3 Operations: user-guide/s3.md
       - Google Sheets: user-guide/gsheets.md
       - Configuration Utilities: user-guide/config.md
+      - Errors and Retries: user-guide/errors.md
   - How-To Guides:
       - Recipes: how-to/index.md
   - API Reference:

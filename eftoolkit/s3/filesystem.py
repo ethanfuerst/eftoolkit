@@ -124,11 +124,24 @@ def _parse_s3_uri(s3_uri: str) -> tuple[str, str]:
 class S3FileSystem:
     """S3 filesystem client for reading/writing parquet files.
 
-    Falls back to environment variables if credentials are not provided:
-      - S3_ACCESS_KEY_ID / AWS_ACCESS_KEY_ID
-      - S3_SECRET_ACCESS_KEY / AWS_SECRET_ACCESS_KEY
-      - S3_REGION / AWS_REGION
-      - S3_ENDPOINT
+    For each credential field, precedence is:
+    explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
+
+    +---------------------+--------------------------+---------------------------+
+    | Field               | Primary env var          | Fallback env var          |
+    +=====================+==========================+===========================+
+    | access_key_id       | ``S3_ACCESS_KEY_ID``     | ``AWS_ACCESS_KEY_ID``     |
+    +---------------------+--------------------------+---------------------------+
+    | secret_access_key   | ``S3_SECRET_ACCESS_KEY`` | ``AWS_SECRET_ACCESS_KEY`` |
+    +---------------------+--------------------------+---------------------------+
+    | region              | ``S3_REGION``            | ``AWS_REGION``            |
+    +---------------------+--------------------------+---------------------------+
+    | endpoint            | ``S3_ENDPOINT``          | — (no fallback)           |
+    +---------------------+--------------------------+---------------------------+
+
+    ``AWS_DEFAULT_REGION`` is **not** consulted. ``AWS_SESSION_TOKEN`` and
+    ``AWS_PROFILE`` are likewise not read — if you need session credentials
+    or profile-based auth, construct a ``boto3.session.Session`` yourself.
     """
 
     def __init__(
@@ -142,10 +155,20 @@ class S3FileSystem:
         """Initialize S3 filesystem.
 
         Args:
-            access_key_id: AWS access key ID
-            secret_access_key: AWS secret access key
-            region: AWS region
-            endpoint: Custom S3 endpoint (e.g., 'nyc3.digitaloceanspaces.com')
+            access_key_id: S3 access key ID. Falls back to
+                ``S3_ACCESS_KEY_ID``, then ``AWS_ACCESS_KEY_ID``.
+            secret_access_key: S3 secret access key. Falls back to
+                ``S3_SECRET_ACCESS_KEY``, then ``AWS_SECRET_ACCESS_KEY``.
+            region: AWS region. Falls back to ``S3_REGION``, then
+                ``AWS_REGION``. Note: ``AWS_DEFAULT_REGION`` is **not**
+                consulted.
+            endpoint: Custom S3 endpoint (e.g.,
+                ``'nyc3.digitaloceanspaces.com'``). Falls back to
+                ``S3_ENDPOINT``.
+
+        Raises:
+            ValueError: If no access key and secret can be resolved from
+                either kwargs or environment variables.
         """
         self.access_key_id = access_key_id or os.getenv(
             'S3_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')
@@ -260,8 +283,14 @@ class S3FileSystem:
             df: DataFrame to write
             s3_uri: S3 URI (e.g., 's3://bucket/path/file.parquet')
 
+        Returns:
+            ``None``. The row count is ``len(df)`` and the destination URI
+            is the one you passed in. If you need the object's ``ETag`` or
+            similar, call ``boto3``'s ``head_object`` directly against the
+            same URI.
+
         Raises:
-            ValueError: If URI does not end with .parquet
+            ValueError: If URI does not end with ``.parquet``.
         """
         _, key = _parse_s3_uri(s3_uri)
         if not key.endswith('.parquet'):

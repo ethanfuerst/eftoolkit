@@ -29,6 +29,12 @@ cd eftoolkit
 uv sync
 ```
 
+## Stability
+
+`eftoolkit` is **Alpha**. Minor bumps aim to be additive; breaking changes
+ship with a major bump. See the [version policy](https://tidbitstatistics.com/eftoolkit/#version-policy)
+for pin recommendations.
+
 ## Quick Start
 
 ```python

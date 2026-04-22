@@ -51,6 +51,22 @@ active_users = db.get_table('users', where="active = true")
 
 ## S3 Integration
 
+### Constructor kwargs
+
+All S3-related kwargs on `DuckDB(...)` are keyword-only.
+
+| Kwarg | Default | Purpose |
+|-------|---------|---------|
+| `database` | `':memory:'` | DuckDB file path or in-memory sentinel. **Positional.** |
+| `s3` | `None` | Existing `S3FileSystem` instance. Takes precedence over the `s3_*` kwargs. |
+| `s3_access_key_id` | `None` | Plumbed to both the DuckDB native S3 layer (`CREATE SECRET`) and an internal `S3FileSystem`. |
+| `s3_secret_access_key` | `None` | Same plumbing as `s3_access_key_id`. |
+| `s3_region` | `None` | AWS region. |
+| `s3_endpoint` | `None` | Custom S3 endpoint for non-AWS services (DO Spaces, R2, MinIO). |
+| `s3_url_style` | `None` | `'path'` or `'vhost'`. Emitted as `SET s3_url_style='<v>'`. Not forwarded to `S3FileSystem`. |
+
+If both `s3` and the credential kwargs are supplied, `s3` wins.
+
 ### Configuration
 
 Provide S3 credentials at initialization:
@@ -99,6 +115,10 @@ db.execute("""
     TO 's3://my-bucket/output.parquet' (FORMAT PARQUET)
 """)
 ```
+
+!!! note "Return value"
+    `write_df_to_s3_parquet` returns `None`. Row count is `len(df)`; the
+    destination URI is the one you passed in.
 
 ### Custom Endpoints
 
@@ -165,14 +185,24 @@ conn.execute("LOAD spatial")
 
 ## Environment Variables
 
-S3 credentials can come from environment variables:
+`DuckDB` does not read environment variables. For env-var-driven auth,
+construct an `S3FileSystem` explicitly:
 
-| Variable | Fallback | Description |
-|----------|----------|-------------|
-| `S3_ACCESS_KEY_ID` | `AWS_ACCESS_KEY_ID` | Access key |
-| `S3_SECRET_ACCESS_KEY` | `AWS_SECRET_ACCESS_KEY` | Secret key |
-| `S3_REGION` | `AWS_REGION` | AWS region |
-| `S3_ENDPOINT` | - | Custom endpoint |
+```python
+from eftoolkit import DuckDB, S3FileSystem
+
+# S3FileSystem reads S3_* / AWS_* env vars
+db = DuckDB(s3=S3FileSystem())
+```
+
+!!! warning "Partial coverage"
+    Env-var credentials resolved through the inner `S3FileSystem` apply
+    **only** to `read_parquet_from_s3` / `write_df_to_s3_parquet`. Native
+    DuckDB SQL against `s3://` URIs (via `INSTALL httpfs` + `CREATE SECRET`)
+    needs credentials passed through the `s3_*` kwargs explicitly.
+
+See the [S3 Operations env-var table](s3.md#environment-variables) for the
+full precedence order.
 
 ## See Also
 

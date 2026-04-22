@@ -32,14 +32,33 @@ class DuckDB:
     ):
         """Initialize DuckDB with optional S3 integration.
 
+        The ``s3_*`` kwargs configure both the DuckDB native S3 layer
+        (``INSTALL httpfs`` + ``CREATE SECRET``) and an internal
+        :class:`~eftoolkit.s3.S3FileSystem` used by
+        :meth:`read_parquet_from_s3` and :meth:`write_df_to_s3_parquet`.
+
+        Unlike :class:`~eftoolkit.s3.S3FileSystem`, ``DuckDB`` does **not**
+        read environment variables. For env-var-driven auth, pass
+        ``s3=S3FileSystem()``. Note that those env-var credentials then
+        apply only to ``read_parquet_from_s3`` / ``write_df_to_s3_parquet``,
+        not to native DuckDB SQL against ``s3://`` URIs (which needs the
+        credentials threaded through the ``s3_*`` kwargs).
+
         Args:
-            database: Path to the database file or ':memory:' for in-memory database
-            s3: Existing S3FileSystem instance to use for S3 operations
-            s3_region: AWS region for S3 access (creates S3FileSystem internally)
-            s3_access_key_id: AWS access key ID for S3 access
-            s3_secret_access_key: AWS secret access key for S3 access
-            s3_endpoint: Custom S3 endpoint
-            s3_url_style: S3 URL style ('path' or 'vhost')
+            database: DuckDB file path or ``':memory:'`` for an in-memory
+                database. Default: ``':memory:'``.
+            s3: Existing :class:`~eftoolkit.s3.S3FileSystem` to reuse. Takes
+                precedence over the ``s3_*`` kwargs. Default: ``None``.
+            s3_region: AWS region. Default: ``None``.
+            s3_access_key_id: S3 access key ID. Default: ``None``.
+            s3_secret_access_key: S3 secret access key. Default: ``None``.
+            s3_endpoint: Custom S3 endpoint (e.g.,
+                ``'nyc3.digitaloceanspaces.com'``) for non-AWS services like
+                DigitalOcean Spaces, Cloudflare R2, or MinIO. Default: ``None``.
+            s3_url_style: S3 URL style, ``'path'`` or ``'vhost'``. Emitted as
+                ``SET s3_url_style='<value>'`` on the connection. Not
+                forwarded to the internal ``S3FileSystem`` (``boto3`` uses
+                vhost-style by default). Default: ``None``.
         """
         self.database = database
         self._s3 = s3
@@ -230,8 +249,13 @@ class DuckDB:
             df: DataFrame to write
             s3_uri: S3 URI (e.g., 's3://bucket/path/file.parquet')
 
+        Returns:
+            ``None``. The row count is ``len(df)`` and the destination URI
+            is the one you passed in; no round-trip is needed to recover
+            either.
+
         Raises:
-            ValueError: If S3 is not configured
+            ValueError: If S3 is not configured.
         """
         if self._s3 is None:
             raise ValueError(

@@ -42,3 +42,27 @@ with ss.worksheet('Sheet1') as ws:
 ## Getting Started
 
 Ready to get started? Check out the [Installation](getting-started/installation.md) guide and [Quickstart](getting-started/quickstart.md) tutorial.
+
+## Version policy
+
+`eftoolkit` is classified **Alpha** (`Development Status :: 3 - Alpha` in
+PyPI metadata). Versioning follows [Semantic Versioning](https://semver.org/):
+
+- **Minor** bumps aim to be **additive** — new kwargs, methods, modules.
+- **Breaking** changes ship with a **major** bump (the `1.4.0` → `2.0.0`
+  jump that introduced `CellRange` is the reference case).
+- **Patch** bumps are bug fixes and documentation.
+
+Until the package reaches `3.0.0` / Beta status, no long-term API
+compatibility guarantees apply. Suggested pins by appetite:
+
+| Appetite | Pin | Effect |
+|----------|-----|--------|
+| Production-ish | `eftoolkit~=X.Y.0` | Patch-only updates. |
+| Conservative | `eftoolkit>=X.Y,<NEXT_MAJOR` (e.g. `>=2.0,<3`) | Avoid the next major. |
+| Bleeding edge | Track `main` | New features and occasional churn. |
+
+See the [changelog](development/changelog.md) and
+[GitHub releases](https://github.com/ethanfuerst/eftoolkit/releases) for
+the breakage surface per version. (The hand-maintained changelog may lag
+behind git tags.)
