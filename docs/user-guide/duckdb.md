@@ -194,7 +194,7 @@ kwargs are omitted. Per field, precedence is:
 |--------------|------------------|--------------------|
 | `s3_access_key_id` | `S3_ACCESS_KEY_ID` | `AWS_ACCESS_KEY_ID` |
 | `s3_secret_access_key` | `S3_SECRET_ACCESS_KEY` | `AWS_SECRET_ACCESS_KEY` |
-| `s3_region` | `S3_REGION` | `AWS_REGION` |
+| `s3_region` | `S3_REGION` | `AWS_REGION`, then `AWS_DEFAULT_REGION` |
 | `s3_endpoint` | `S3_ENDPOINT` | _(no fallback)_ |
 
 Resolved credentials apply to both the internal `S3FileSystem` (used by
@@ -214,9 +214,8 @@ If neither kwargs nor env vars yield both `s3_access_key_id` and
 methods then raise `ValueError('S3 not configured')`.
 
 !!! note "Not consulted"
-    `AWS_DEFAULT_REGION`, `S3_URL_STYLE`, `AWS_SESSION_TOKEN`, and
-    `AWS_PROFILE` are not read. See the
-    [S3 env-var section](s3.md#environment-variables).
+    `S3_URL_STYLE`, `AWS_SESSION_TOKEN`, and `AWS_PROFILE` are not read.
+    See the [S3 env-var section](s3.md#environment-variables).
 
 ## See Also
 

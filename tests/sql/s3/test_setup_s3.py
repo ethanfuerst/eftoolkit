@@ -114,6 +114,24 @@ def test_duckdb_credentials_from_aws_env_vars(clear_s3_env):
     assert (secrets['type'] == 's3').any()
 
 
+def test_duckdb_credentials_from_aws_default_region(clear_s3_env):
+    """DuckDB falls back to AWS_DEFAULT_REGION for region when others are unset."""
+    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
+    os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+
+    db = DuckDB()
+
+    assert db.s3_access_key_id == 'aws-key'
+    assert db.s3_secret_access_key == 'aws-secret'
+    assert db.s3_region == 'ap-southeast-2'
+    assert db._s3 is not None
+
+    secrets = db.query('SELECT name, type FROM duckdb_secrets()')
+
+    assert (secrets['type'] == 's3').any()
+
+
 def test_setup_s3_without_url_style(mock_s3_bucket):
     """_setup_s3 works without url_style."""
     db = DuckDB(

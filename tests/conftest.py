@@ -50,6 +50,7 @@ def clear_s3_env():
         'AWS_ACCESS_KEY_ID',
         'AWS_SECRET_ACCESS_KEY',
         'AWS_REGION',
+        'AWS_DEFAULT_REGION',
     ]
     saved = {k: os.environ.pop(k, None) for k in keys}
     try:

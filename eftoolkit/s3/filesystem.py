@@ -131,6 +131,8 @@ def _resolve_s3_credentials(
 
     For each field, precedence is:
     explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
+    For ``region``, the ``AWS_*`` step is itself a chain:
+    ``AWS_REGION`` > ``AWS_DEFAULT_REGION`` (matches boto3's own ordering).
     ``endpoint`` has no ``AWS_*`` fallback.
 
     Returns a 4-tuple of resolved values, any of which may be ``None`` if
@@ -141,7 +143,11 @@ def _resolve_s3_credentials(
         access_key_id or os.getenv('S3_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')),
         secret_access_key
         or os.getenv('S3_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')),
-        region or os.getenv('S3_REGION', os.getenv('AWS_REGION')),
+        region
+        or os.getenv(
+            'S3_REGION',
+            os.getenv('AWS_REGION', os.getenv('AWS_DEFAULT_REGION')),
+        ),
         endpoint or os.getenv('S3_ENDPOINT'),
     )
 
@@ -152,21 +158,21 @@ class S3FileSystem:
     For each credential field, precedence is:
     explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
 
-    +---------------------+--------------------------+---------------------------+
-    | Field               | Primary env var          | Fallback env var          |
-    +=====================+==========================+===========================+
-    | access_key_id       | ``S3_ACCESS_KEY_ID``     | ``AWS_ACCESS_KEY_ID``     |
-    +---------------------+--------------------------+---------------------------+
-    | secret_access_key   | ``S3_SECRET_ACCESS_KEY`` | ``AWS_SECRET_ACCESS_KEY`` |
-    +---------------------+--------------------------+---------------------------+
-    | region              | ``S3_REGION``            | ``AWS_REGION``            |
-    +---------------------+--------------------------+---------------------------+
-    | endpoint            | ``S3_ENDPOINT``          | — (no fallback)           |
-    +---------------------+--------------------------+---------------------------+
+    +---------------------+--------------------------+--------------------------------------------+
+    | Field               | Primary env var          | Fallback env var(s)                        |
+    +=====================+==========================+============================================+
+    | access_key_id       | ``S3_ACCESS_KEY_ID``     | ``AWS_ACCESS_KEY_ID``                      |
+    +---------------------+--------------------------+--------------------------------------------+
+    | secret_access_key   | ``S3_SECRET_ACCESS_KEY`` | ``AWS_SECRET_ACCESS_KEY``                  |
+    +---------------------+--------------------------+--------------------------------------------+
+    | region              | ``S3_REGION``            | ``AWS_REGION`` then ``AWS_DEFAULT_REGION`` |
+    +---------------------+--------------------------+--------------------------------------------+
+    | endpoint            | ``S3_ENDPOINT``          | — (no fallback)                            |
+    +---------------------+--------------------------+--------------------------------------------+
 
-    ``AWS_DEFAULT_REGION`` is **not** consulted. ``AWS_SESSION_TOKEN`` and
-    ``AWS_PROFILE`` are likewise not read — if you need session credentials
-    or profile-based auth, construct a ``boto3.session.Session`` yourself.
+    ``AWS_SESSION_TOKEN`` and ``AWS_PROFILE`` are not read — if you need
+    session credentials or profile-based auth, construct a
+    ``boto3.session.Session`` yourself.
     """
 
     def __init__(
@@ -185,8 +191,7 @@ class S3FileSystem:
             secret_access_key: S3 secret access key. Falls back to
                 ``S3_SECRET_ACCESS_KEY``, then ``AWS_SECRET_ACCESS_KEY``.
             region: AWS region. Falls back to ``S3_REGION``, then
-                ``AWS_REGION``. Note: ``AWS_DEFAULT_REGION`` is **not**
-                consulted.
+                ``AWS_REGION``, then ``AWS_DEFAULT_REGION``.
             endpoint: Custom S3 endpoint (e.g.,
                 ``'nyc3.digitaloceanspaces.com'``). Falls back to
                 ``S3_ENDPOINT``.
