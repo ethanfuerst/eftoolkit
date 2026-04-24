@@ -58,6 +58,7 @@ def test_get_client_without_region():
     os.environ['S3_SECRET_ACCESS_KEY'] = 'secret'
     os.environ.pop('S3_REGION', None)
     os.environ.pop('AWS_REGION', None)
+    os.environ.pop('AWS_DEFAULT_REGION', None)
 
     try:
         fs = S3FileSystem()

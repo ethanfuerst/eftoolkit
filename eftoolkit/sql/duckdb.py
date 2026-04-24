@@ -48,7 +48,8 @@ class DuckDB:
             s3: Existing :class:`~eftoolkit.s3.S3FileSystem` to reuse. Takes
                 precedence over the ``s3_*`` kwargs. Default: ``None``.
             s3_region: AWS region. Falls back to ``S3_REGION``, then
-                ``AWS_REGION``. Default: ``None``.
+                ``AWS_REGION``, then ``AWS_DEFAULT_REGION``. Default:
+                ``None``.
             s3_access_key_id: S3 access key ID. Falls back to
                 ``S3_ACCESS_KEY_ID``, then ``AWS_ACCESS_KEY_ID``.
                 Default: ``None``.

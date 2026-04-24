@@ -63,6 +63,26 @@ def test_credentials_from_aws_env_vars():
         os.environ.pop('AWS_REGION', None)
 
 
+def test_credentials_from_aws_default_region():
+    """Region falls back to AWS_DEFAULT_REGION when S3_REGION/AWS_REGION are unset."""
+    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
+    os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+    os.environ.pop('S3_REGION', None)
+    os.environ.pop('AWS_REGION', None)
+
+    try:
+        fs = S3FileSystem()
+
+        assert fs.access_key_id == 'aws-key'
+        assert fs.secret_access_key == 'aws-secret'
+        assert fs.region == 'ap-southeast-2'
+    finally:
+        os.environ.pop('AWS_ACCESS_KEY_ID', None)
+        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
+        os.environ.pop('AWS_DEFAULT_REGION', None)
+
+
 def test_explicit_credentials_override_env_vars():
     """Explicit credentials take precedence over env vars."""
     os.environ['S3_ACCESS_KEY_ID'] = 'env-key'
@@ -97,3 +117,22 @@ def test_s3_env_vars_take_precedence_over_aws():
         os.environ.pop('AWS_ACCESS_KEY_ID', None)
         os.environ.pop('S3_SECRET_ACCESS_KEY', None)
         os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
+
+
+def test_aws_region_takes_precedence_over_aws_default_region():
+    """AWS_REGION wins over AWS_DEFAULT_REGION (matches boto3 ordering)."""
+    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
+    os.environ['AWS_REGION'] = 'eu-west-1'
+    os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+    os.environ.pop('S3_REGION', None)
+
+    try:
+        fs = S3FileSystem()
+
+        assert fs.region == 'eu-west-1'
+    finally:
+        os.environ.pop('AWS_ACCESS_KEY_ID', None)
+        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
+        os.environ.pop('AWS_REGION', None)
+        os.environ.pop('AWS_DEFAULT_REGION', None)
