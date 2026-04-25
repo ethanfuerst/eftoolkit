@@ -63,7 +63,7 @@ All S3-related kwargs on `DuckDB(...)` are keyword-only.
 | `s3_secret_access_key` | `None` | Same plumbing as `s3_access_key_id`. |
 | `s3_region` | `None` | AWS region. |
 | `s3_endpoint` | `None` | Custom S3 endpoint for non-AWS services (DO Spaces, R2, MinIO). |
-| `s3_url_style` | `None` | `'path'` or `'vhost'`. Emitted as `SET s3_url_style='<v>'`. Not forwarded to `S3FileSystem`. |
+| `s3_url_style` | `None` | `'path'` or `'vhost'`. Emitted as `SET s3_url_style='<v>'`. Falls back to `S3_URL_STYLE`. Not forwarded to `S3FileSystem`. |
 
 If both `s3` and the credential kwargs are supplied, `s3` wins.
 
@@ -196,6 +196,7 @@ credential kwargs are omitted. Per field, precedence is:
 | `s3_secret_access_key` | `AWS_SECRET_ACCESS_KEY` |
 | `s3_region` | `AWS_REGION`, then `AWS_DEFAULT_REGION` |
 | `s3_endpoint` | `AWS_ENDPOINT_URL_S3` |
+| `s3_url_style` | `S3_URL_STYLE` |
 
 Resolved credentials apply to both the internal `S3FileSystem` (used by
 `read_parquet_from_s3` / `write_df_to_s3_parquet`) and the native DuckDB
@@ -220,7 +221,7 @@ methods then raise `ValueError('S3 not configured')`.
     AWS-standard equivalents above.
 
 !!! note "Not consulted"
-    `S3_URL_STYLE`, `AWS_SESSION_TOKEN`, and `AWS_PROFILE` are not read.
+    `AWS_SESSION_TOKEN` and `AWS_PROFILE` are not read.
     See the [S3 env-var section](s3.md#environment-variables).
 
 ## See Also
