@@ -1,5 +1,6 @@
 """DuckDB wrapper with S3 integration."""
 
+import os
 from contextlib import contextmanager
 
 import duckdb
@@ -59,7 +60,7 @@ class DuckDB:
             s3_url_style: S3 URL style, ``'path'`` or ``'vhost'``. Emitted as
                 ``SET s3_url_style='<value>'`` on the connection. Not
                 forwarded to the internal ``S3FileSystem`` (``boto3`` uses
-                vhost-style by default). Does not read from the environment.
+                vhost-style by default). Falls back to ``S3_URL_STYLE``.
                 Default: ``None``.
         """
         self.database = database
@@ -72,7 +73,9 @@ class DuckDB:
         ) = _resolve_s3_credentials(
             s3_access_key_id, s3_secret_access_key, s3_region, s3_endpoint
         )
-        self.s3_url_style = s3_url_style
+        self.s3_url_style = (
+            s3_url_style if s3_url_style is not None else os.getenv('S3_URL_STYLE')
+        )
         self._active_conn: duckdb.DuckDBPyConnection | None = None
 
         if self._s3 is None and self.s3_access_key_id and self.s3_secret_access_key:

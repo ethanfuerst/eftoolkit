@@ -171,3 +171,48 @@ def test_setup_s3_with_endpoint_and_url_style(mock_s3_bucket):
     result = db.query('SELECT 1 as num')
 
     assert result['num'][0] == 1
+
+
+def test_setup_s3_url_style_from_env(monkeypatch, mock_s3_bucket):
+    """DuckDB resolves s3_url_style from S3_URL_STYLE env var when kwarg is None."""
+    monkeypatch.setenv('S3_URL_STYLE', 'path')
+
+    db = DuckDB(
+        s3_access_key_id='testing',
+        s3_secret_access_key='testing',
+        s3_region='us-east-1',
+    )
+
+    assert db.s3_url_style == 'path'
+
+    # Confirm _setup_s3 ran SET s3_url_style without raising
+    result = db.query('SELECT 1 as num')
+
+    assert result['num'][0] == 1
+
+
+def test_setup_s3_url_style_kwarg_overrides_env(monkeypatch):
+    """Explicit s3_url_style kwarg wins over S3_URL_STYLE env var."""
+    monkeypatch.setenv('S3_URL_STYLE', 'path')
+
+    db = DuckDB(
+        s3_access_key_id='testing',
+        s3_secret_access_key='testing',
+        s3_region='us-east-1',
+        s3_url_style='vhost',
+    )
+
+    assert db.s3_url_style == 'vhost'
+
+
+def test_setup_s3_url_style_unset_when_no_env_or_kwarg(monkeypatch):
+    """s3_url_style is None when neither kwarg nor S3_URL_STYLE env var is set."""
+    monkeypatch.delenv('S3_URL_STYLE', raising=False)
+
+    db = DuckDB(
+        s3_access_key_id='testing',
+        s3_secret_access_key='testing',
+        s3_region='us-east-1',
+    )
+
+    assert db.s3_url_style is None
