@@ -1,5 +1,7 @@
 """Tests for Worksheet flush, read, and preview functionality."""
 
+import time
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -318,3 +320,67 @@ def test_worksheet_open_preview_opens_browser(tmp_path):
         ws.open_preview()
         mock_open.assert_called_once()
         assert 'file://' in mock_open.call_args[0][0]
+
+
+# --- Deferred callable tests ---
+
+
+def test_write_values_resolves_callable_at_flush_api():
+    """write_values callable cells resolve at flush time in API mode."""
+    mock_gspread = MagicMock()
+    mock_ws = MagicMock()
+    mock_ws.title = 'Sheet1'
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    ws = Worksheet(mock_ws, ss)
+    ws.write_values('A1', [[lambda: 42]])
+    ws.flush()
+
+    call_kwargs = mock_gspread.values_batch_update.call_args[0][0]
+    sent_values = call_kwargs['data'][0]['values']
+
+    assert sent_values == [[42]]
+
+
+def test_write_values_resolves_callable_at_flush_preview(tmp_path):
+    """write_values callable cells resolve at flush time in preview mode."""
+    ss = Spreadsheet(
+        local_preview=True, spreadsheet_name='Test', preview_dir=str(tmp_path)
+    )
+    ws = ss.worksheet('Sheet1')
+
+    ws.write_values('A1', [[lambda: 'hello']])
+    ws.flush()
+
+    html_files = list(tmp_path.glob('*.html'))
+    content = html_files[0].read_text()
+
+    assert 'hello' in content
+    assert '<function' not in content
+    assert 'lambda' not in content
+
+
+def test_write_values_callable_freshness():
+    """Callable is invoked at flush time, not queue time."""
+    mock_gspread = MagicMock()
+    mock_ws = MagicMock()
+    mock_ws.title = 'Sheet1'
+
+    ss = Spreadsheet(local_preview=True, spreadsheet_name='Test')
+    ss._local_preview = False
+    ss._gspread_spreadsheet = mock_gspread
+
+    ws = Worksheet(mock_ws, ss)
+    pre_queue = datetime.now()
+    ws.write_values('A1', [[datetime.now]])
+    time.sleep(0.05)
+    ws.flush()
+
+    call_kwargs = mock_gspread.values_batch_update.call_args[0][0]
+    resolved = call_kwargs['data'][0]['values'][0][0]
+
+    assert isinstance(resolved, datetime)
+    assert (resolved - pre_queue).total_seconds() >= 0.05

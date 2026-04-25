@@ -161,6 +161,18 @@ with ss.worksheet('Sheet1') as ws:
     ws.write_dataframe(pd.DataFrame([['Hello']]), location='A1', include_header=False)
 ```
 
+#### Deferred values with callables
+
+Any cell in `write_values` may be a zero-arg callable. The callable runs at flush time, so the value reflects the moment of the API call — useful for stamping "Last Updated":
+
+```python
+from datetime import datetime
+
+with ss.worksheet('Summary') as ws:
+    ws.write_dataframe(df, location='A3')
+    ws.write_values('A1', [[datetime.now]])  # resolves when the batch is sent
+```
+
 !!! warning "`Worksheet.__exit__` does not flush on exception"
     Exiting a `with ss.worksheet(...) as ws:` block via an exception **silently drops** queued operations. Only clean exits flush. If you need partial writes on error, call `ws.flush()` explicitly inside the `try` block.
 
@@ -812,7 +824,7 @@ This is useful for validating that formatting operations target ranges within an
 
 ### Local Preview Mode
 
-Test your dashboard without API credentials:
+Test your dashboard without API credentials. `credentials` is required unless `local_preview=True`. When in preview mode, pass `credentials=None` (the default) and the runner skips phases 0, 1, and 6.
 
 ```python
 runner = DashboardRunner(

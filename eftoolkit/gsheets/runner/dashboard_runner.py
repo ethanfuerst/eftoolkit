@@ -84,7 +84,7 @@ class DashboardRunner:
     def __init__(
         self,
         config: dict[str, Any],
-        credentials: dict[str, Any],
+        credentials: dict[str, Any] | None = None,
         worksheets: list[WorksheetDefinition] | None = None,
         *,
         pre_run_hooks: list[Callable[[SpreadsheetType], None]] | None = None,
@@ -97,6 +97,7 @@ class DashboardRunner:
             config: Configuration dictionary. Must include 'sheet_name' key.
                 Passed to each worksheet's generate() method.
             credentials: Google service account credentials dictionary.
+                Required unless ``local_preview=True``.
             worksheets: List of worksheet definitions to process. If None,
                 uses worksheets from WorksheetRegistry.
             pre_run_hooks: List of callables that receive a Spreadsheet instance.
@@ -111,10 +112,14 @@ class DashboardRunner:
 
         Raises:
             ValueError: If 'sheet_name' not in config.
+            ValueError: If credentials is None and local_preview is False.
             ValueError: If no worksheets provided and registry is empty.
         """
         if 'sheet_name' not in config:
             raise ValueError("config must include 'sheet_name' key")
+
+        if credentials is None and not local_preview:
+            raise ValueError('credentials is required unless local_preview=True')
 
         self.config = config
         self.credentials = credentials
@@ -255,13 +260,14 @@ class DashboardRunner:
                 worksheet_instances[worksheet_def.name] = ws
 
                 for asset in self.results[worksheet_def.name]:
+                    df = asset.df
                     ws.write_dataframe(
-                        df=asset.df,
+                        df=df,
                         location=asset.location.cell,
                     )
                     logger.info(
                         '  Wrote %d rows to %s!%s',
-                        len(asset.df),
+                        len(df),
                         worksheet_def.name,
                         asset.location.cell,
                     )

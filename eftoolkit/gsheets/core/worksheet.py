@@ -242,7 +242,10 @@ class Worksheet:
         Args:
             range_name: A1 notation range, CellLocation, or CellRange
                 (e.g., 'A1:B2', CellRange.from_string('A1:B2')).
-            values: 2D list of values to write.
+            values: 2D list of values to write. Any cell may be a zero-arg
+                callable (e.g., ``datetime.now``); callables are invoked at
+                flush time so the value reflects the moment of the API call,
+                not the moment of queuing.
         """
         range_obj = self._to_range(range_name)
         range_str = range_obj.value
@@ -730,6 +733,22 @@ class Worksheet:
             return range_value.value
         return range_value
 
+    @staticmethod
+    def _resolve_value_updates(updates: list[dict]) -> list[dict]:
+        """Resolve zero-arg callables inside each update's 2-D ``values`` list.
+
+        Returns a new list of update dicts where any ``callable(cell)`` has been
+        replaced with ``cell()``. Non-callable cells pass through unchanged.
+        """
+        resolved: list[dict] = []
+        for update in updates:
+            values = update['values']
+            new_values = [
+                [cell() if callable(cell) else cell for cell in row] for row in values
+            ]
+            resolved.append({**update, 'values': new_values})
+        return resolved
+
     def _flush_to_api(self) -> None:
         """Send queued operations to Google Sheets API."""
         if not self._ws:
@@ -737,11 +756,12 @@ class Worksheet:
 
         # Flush value updates via parent spreadsheet's batch update
         if self._value_updates:
+            resolved_updates = self._resolve_value_updates(self._value_updates)
             self._spreadsheet._execute_with_retry(
                 lambda: self._spreadsheet._gspread_spreadsheet.values_batch_update(
                     {
                         'valueInputOption': 'USER_ENTERED',
-                        'data': self._value_updates,
+                        'data': resolved_updates,
                     }
                 ),
                 'values_batch_update',
@@ -1260,8 +1280,9 @@ class Worksheet:
 
     def _flush_to_preview(self) -> None:
         """Render queued operations to local HTML preview as a unified grid."""
-        # Accumulate current updates into history
-        self._preview_history.extend(self._value_updates)
+        # Resolve callables before accumulating into preview history so the
+        # rendered HTML shows the same value the live write would send.
+        self._preview_history.extend(self._resolve_value_updates(self._value_updates))
 
         # Process batch requests for preview metadata
         for req in self._batch_requests:

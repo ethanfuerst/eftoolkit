@@ -104,6 +104,29 @@ def test_init_no_worksheets_raises():
         )
 
 
+def test_init_raises_when_credentials_missing_and_not_preview():
+    """DashboardRunner raises ValueError when credentials is None and not local_preview."""
+    with pytest.raises(ValueError, match='credentials is required'):
+        DashboardRunner(
+            config={'sheet_name': 'Test'},
+            credentials=None,
+            worksheets=[MockWorksheetDefinition('Test')],
+        )
+
+
+def test_init_allows_none_credentials_in_preview():
+    """DashboardRunner accepts credentials=None when local_preview=True."""
+    runner = DashboardRunner(
+        config={'sheet_name': 'Test'},
+        credentials=None,
+        worksheets=[MockWorksheetDefinition('Test')],
+        local_preview=True,
+    )
+
+    assert runner.credentials is None
+    assert runner.local_preview is True
+
+
 def test_phase_2_generate_data():
     """Phase 2 generates data from all worksheets."""
     ws1 = MockWorksheetDefinition('Sheet1', pd.DataFrame({'a': [1, 2]}))
