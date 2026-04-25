@@ -38,8 +38,7 @@ class DuckDB:
 
         Each credential field falls back through the same precedence chain
         as :class:`~eftoolkit.s3.S3FileSystem`: explicit ``s3_*`` kwarg →
-        ``S3_*`` env var → ``AWS_*`` env var (``s3_endpoint`` has no
-        ``AWS_*`` fallback). See :class:`~eftoolkit.s3.S3FileSystem` for
+        AWS-standard env var. See :class:`~eftoolkit.s3.S3FileSystem` for
         the full table.
 
         Args:
@@ -47,19 +46,16 @@ class DuckDB:
                 database. Default: ``':memory:'``.
             s3: Existing :class:`~eftoolkit.s3.S3FileSystem` to reuse. Takes
                 precedence over the ``s3_*`` kwargs. Default: ``None``.
-            s3_region: AWS region. Falls back to ``S3_REGION``, then
-                ``AWS_REGION``, then ``AWS_DEFAULT_REGION``. Default:
-                ``None``.
+            s3_region: AWS region. Falls back to ``AWS_REGION``, then
+                ``AWS_DEFAULT_REGION``. Default: ``None``.
             s3_access_key_id: S3 access key ID. Falls back to
-                ``S3_ACCESS_KEY_ID``, then ``AWS_ACCESS_KEY_ID``.
-                Default: ``None``.
+                ``AWS_ACCESS_KEY_ID``. Default: ``None``.
             s3_secret_access_key: S3 secret access key. Falls back to
-                ``S3_SECRET_ACCESS_KEY``, then ``AWS_SECRET_ACCESS_KEY``.
-                Default: ``None``.
+                ``AWS_SECRET_ACCESS_KEY``. Default: ``None``.
             s3_endpoint: Custom S3 endpoint (e.g.,
                 ``'nyc3.digitaloceanspaces.com'``) for non-AWS services like
                 DigitalOcean Spaces, Cloudflare R2, or MinIO. Falls back to
-                ``S3_ENDPOINT``. Default: ``None``.
+                ``AWS_ENDPOINT_URL_S3``. Default: ``None``.
             s3_url_style: S3 URL style, ``'path'`` or ``'vhost'``. Emitted as
                 ``SET s3_url_style='<value>'`` on the connection. Not
                 forwarded to the internal ``S3FileSystem`` (``boto3`` uses

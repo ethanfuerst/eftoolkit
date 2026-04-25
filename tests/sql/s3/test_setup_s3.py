@@ -76,28 +76,8 @@ def test_setup_s3_not_called_without_credentials(clear_s3_env):
     assert result['num'][0] == 1
 
 
-def test_duckdb_credentials_from_s3_env_vars(clear_s3_env):
-    """DuckDB resolves S3 creds from S3_* env vars and configures a native secret."""
-    os.environ['S3_ACCESS_KEY_ID'] = 'test-key'
-    os.environ['S3_SECRET_ACCESS_KEY'] = 'test-secret'
-    os.environ['S3_REGION'] = 'us-west-2'
-
-    db = DuckDB()
-
-    assert db.s3_access_key_id == 'test-key'
-    assert db.s3_secret_access_key == 'test-secret'
-    assert db.s3_region == 'us-west-2'
-    assert db._s3 is not None
-    assert isinstance(db.s3, S3FileSystem)
-
-    secrets = db.query('SELECT name, type FROM duckdb_secrets()')
-
-    assert len(secrets) >= 1
-    assert (secrets['type'] == 's3').any()
-
-
 def test_duckdb_credentials_from_aws_env_vars(clear_s3_env):
-    """DuckDB falls back to AWS_* env vars when S3_* aren't set."""
+    """DuckDB resolves S3 creds from AWS-standard env vars and configures a native secret."""
     os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
     os.environ['AWS_REGION'] = 'eu-west-1'
@@ -108,10 +88,26 @@ def test_duckdb_credentials_from_aws_env_vars(clear_s3_env):
     assert db.s3_secret_access_key == 'aws-secret'
     assert db.s3_region == 'eu-west-1'
     assert db._s3 is not None
+    assert isinstance(db.s3, S3FileSystem)
 
     secrets = db.query('SELECT name, type FROM duckdb_secrets()')
 
+    assert len(secrets) >= 1
     assert (secrets['type'] == 's3').any()
+
+
+def test_duckdb_endpoint_from_aws_env_var(clear_s3_env):
+    """DuckDB resolves endpoint from AWS_ENDPOINT_URL_S3."""
+    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
+    os.environ['AWS_REGION'] = 'us-east-1'
+    os.environ['AWS_ENDPOINT_URL_S3'] = 'minio.local:9000'
+
+    db = DuckDB()
+
+    assert db.s3_endpoint == 'minio.local:9000'
+    assert db._s3 is not None
+    assert db._s3.endpoint == 'minio.local:9000'
 
 
 def test_duckdb_credentials_from_aws_default_region(clear_s3_env):

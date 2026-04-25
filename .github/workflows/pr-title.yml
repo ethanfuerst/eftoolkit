@@ -15,7 +15,7 @@ jobs:
           TITLE="${{ github.event.pull_request.title }}"
           # Pattern: type(optional-scope): description
           # Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
-          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_-]+\))?: .+'
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_-]+\))?!?: .+'
 
           if [[ ! "$TITLE" =~ $PATTERN ]]; then
             echo "❌ PR title does not follow conventional commits format."

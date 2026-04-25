@@ -7,132 +7,73 @@ import pytest
 from eftoolkit.s3 import S3FileSystem
 
 
-def test_missing_credentials_raises_error():
+def test_missing_credentials_raises_error(clear_s3_env):
     """Missing credentials raises ValueError."""
-    # Clear any env vars
-    for key in [
-        'S3_ACCESS_KEY_ID',
-        'AWS_ACCESS_KEY_ID',
-        'S3_SECRET_ACCESS_KEY',
-        'AWS_SECRET_ACCESS_KEY',
-    ]:
-        os.environ.pop(key, None)
-
     with pytest.raises(ValueError) as exc_info:
         S3FileSystem()
 
     assert 'S3 credentials required' in str(exc_info.value)
+    assert 'AWS_ACCESS_KEY_ID' in str(exc_info.value)
+    assert 'AWS_SECRET_ACCESS_KEY' in str(exc_info.value)
 
 
-def test_credentials_from_s3_env_vars():
-    """Credentials are read from S3_* env vars."""
-    os.environ['S3_ACCESS_KEY_ID'] = 'test-key'
-    os.environ['S3_SECRET_ACCESS_KEY'] = 'test-secret'
-    os.environ['S3_REGION'] = 'us-west-2'
-    os.environ['S3_ENDPOINT'] = 'custom.endpoint.com'
-
-    try:
-        fs = S3FileSystem()
-
-        assert fs.access_key_id == 'test-key'
-        assert fs.secret_access_key == 'test-secret'
-        assert fs.region == 'us-west-2'
-        assert fs.endpoint == 'custom.endpoint.com'
-    finally:
-        os.environ.pop('S3_ACCESS_KEY_ID', None)
-        os.environ.pop('S3_SECRET_ACCESS_KEY', None)
-        os.environ.pop('S3_REGION', None)
-        os.environ.pop('S3_ENDPOINT', None)
-
-
-def test_credentials_from_aws_env_vars():
-    """Credentials are read from AWS_* env vars as fallback."""
+def test_credentials_from_aws_env_vars(clear_s3_env):
+    """Credentials are read from AWS-standard env vars."""
     os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
     os.environ['AWS_REGION'] = 'eu-west-1'
 
-    try:
-        fs = S3FileSystem()
+    fs = S3FileSystem()
 
-        assert fs.access_key_id == 'aws-key'
-        assert fs.secret_access_key == 'aws-secret'
-        assert fs.region == 'eu-west-1'
-    finally:
-        os.environ.pop('AWS_ACCESS_KEY_ID', None)
-        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
-        os.environ.pop('AWS_REGION', None)
+    assert fs.access_key_id == 'aws-key'
+    assert fs.secret_access_key == 'aws-secret'
+    assert fs.region == 'eu-west-1'
 
 
-def test_credentials_from_aws_default_region():
-    """Region falls back to AWS_DEFAULT_REGION when S3_REGION/AWS_REGION are unset."""
+def test_credentials_from_aws_default_region(clear_s3_env):
+    """Region falls back to AWS_DEFAULT_REGION when AWS_REGION is unset."""
     os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
     os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
-    os.environ.pop('S3_REGION', None)
-    os.environ.pop('AWS_REGION', None)
 
-    try:
-        fs = S3FileSystem()
+    fs = S3FileSystem()
 
-        assert fs.access_key_id == 'aws-key'
-        assert fs.secret_access_key == 'aws-secret'
-        assert fs.region == 'ap-southeast-2'
-    finally:
-        os.environ.pop('AWS_ACCESS_KEY_ID', None)
-        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
-        os.environ.pop('AWS_DEFAULT_REGION', None)
+    assert fs.access_key_id == 'aws-key'
+    assert fs.secret_access_key == 'aws-secret'
+    assert fs.region == 'ap-southeast-2'
 
 
-def test_explicit_credentials_override_env_vars():
+def test_explicit_credentials_override_env_vars(clear_s3_env):
     """Explicit credentials take precedence over env vars."""
-    os.environ['S3_ACCESS_KEY_ID'] = 'env-key'
-    os.environ['S3_SECRET_ACCESS_KEY'] = 'env-secret'
+    os.environ['AWS_ACCESS_KEY_ID'] = 'env-key'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'env-secret'
 
-    try:
-        fs = S3FileSystem(
-            access_key_id='explicit-key', secret_access_key='explicit-secret'
-        )
+    fs = S3FileSystem(access_key_id='explicit-key', secret_access_key='explicit-secret')
 
-        assert fs.access_key_id == 'explicit-key'
-        assert fs.secret_access_key == 'explicit-secret'
-    finally:
-        os.environ.pop('S3_ACCESS_KEY_ID', None)
-        os.environ.pop('S3_SECRET_ACCESS_KEY', None)
+    assert fs.access_key_id == 'explicit-key'
+    assert fs.secret_access_key == 'explicit-secret'
 
 
-def test_s3_env_vars_take_precedence_over_aws():
-    """S3_* env vars take precedence over AWS_* env vars."""
-    os.environ['S3_ACCESS_KEY_ID'] = 's3-key'
-    os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
-    os.environ['S3_SECRET_ACCESS_KEY'] = 's3-secret'
-    os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
-
-    try:
-        fs = S3FileSystem()
-
-        assert fs.access_key_id == 's3-key'
-        assert fs.secret_access_key == 's3-secret'
-    finally:
-        os.environ.pop('S3_ACCESS_KEY_ID', None)
-        os.environ.pop('AWS_ACCESS_KEY_ID', None)
-        os.environ.pop('S3_SECRET_ACCESS_KEY', None)
-        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
-
-
-def test_aws_region_takes_precedence_over_aws_default_region():
+def test_aws_region_takes_precedence_over_aws_default_region(clear_s3_env):
     """AWS_REGION wins over AWS_DEFAULT_REGION (matches boto3 ordering)."""
     os.environ['AWS_ACCESS_KEY_ID'] = 'aws-key'
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'aws-secret'
     os.environ['AWS_REGION'] = 'eu-west-1'
     os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
-    os.environ.pop('S3_REGION', None)
+
+    fs = S3FileSystem()
+
+    assert fs.region == 'eu-west-1'
+
+
+def test_legacy_s3_env_vars_are_ignored(clear_s3_env):
+    """Legacy S3_* env vars are no longer consulted (ETH-429)."""
+    os.environ['S3_ACCESS_KEY_ID'] = 'legacy-key'
+    os.environ['S3_SECRET_ACCESS_KEY'] = 'legacy-secret'
 
     try:
-        fs = S3FileSystem()
-
-        assert fs.region == 'eu-west-1'
+        with pytest.raises(ValueError):
+            S3FileSystem()
     finally:
-        os.environ.pop('AWS_ACCESS_KEY_ID', None)
-        os.environ.pop('AWS_SECRET_ACCESS_KEY', None)
-        os.environ.pop('AWS_REGION', None)
-        os.environ.pop('AWS_DEFAULT_REGION', None)
+        os.environ.pop('S3_ACCESS_KEY_ID', None)
+        os.environ.pop('S3_SECRET_ACCESS_KEY', None)
