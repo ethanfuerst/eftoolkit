@@ -559,6 +559,58 @@ def test_read_range_returns_2d_list_for_multiple_columns():
     assert result == [['a', 'b'], ['c', 'd']]
 
 
+def test_read_cell_with_cell_location():
+    """read_cell accepts CellLocation and forwards the resolved A1 string to gspread."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_cell = MagicMock()
+    mock_cell.value = 'typed_value'
+    mock_ws.acell.return_value = mock_cell
+
+    result = ws.read_cell(CellLocation(cell='V5'))
+
+    mock_ws.acell.assert_called_once_with('V5')
+    assert result == 'typed_value'
+
+
+def test_read_cell_with_string_a1_notation():
+    """read_cell still accepts the bare-string passthrough form."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_cell = MagicMock()
+    mock_cell.value = 'string_value'
+    mock_ws.acell.return_value = mock_cell
+
+    result = ws.read_cell('B7')
+
+    mock_ws.acell.assert_called_once_with('B7')
+    assert result == 'string_value'
+
+
+def test_read_range_with_cell_range():
+    """read_range accepts CellRange and forwards the resolved A1 string to gspread."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_ws.get.return_value = [['x'], ['y'], ['z']]
+
+    result = ws.read_range(CellRange.from_string('V5:V7'))
+
+    mock_ws.get.assert_called_once_with('V5:V7')
+    assert result == [['x'], ['y'], ['z']]
+
+
+def test_read_range_with_cell_location():
+    """read_range accepts CellLocation (single cell) and forwards the A1 string."""
+    ws, mock_gspread, mock_ws = _create_mock_worksheet_with_api()
+
+    mock_ws.get.return_value = [['only']]
+
+    result = ws.read_range(CellLocation(cell='V5'))
+
+    mock_ws.get.assert_called_once_with('V5')
+    assert result == [['only']]
+
+
 # --- CellLocation and CellRange Support ---
 
 

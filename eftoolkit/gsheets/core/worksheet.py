@@ -146,7 +146,7 @@ class Worksheet:
 
         return df
 
-    def read_cell(self, cell: CellType) -> Any:
+    def read_cell(self, cell: CellType) -> str | None:
         """Read value of a single cell.
 
         Args:
@@ -154,13 +154,22 @@ class Worksheet:
                 (e.g., 'V5', CellLocation(cell='V5')).
 
         Returns:
-            The cell's value (string, number, or empty string if blank).
+            The cell's value as a string. `gspread` returns every cell as a
+            `str` (no numeric coercion); blank cells come back as `None` or
+            `''` depending on the API response. Coerce numeric / datetime
+            values yourself if needed.
 
         Example:
             ```python
             value = ws.read_cell('V5')
             value = ws.read_cell(CellLocation(cell='V5'))
             ```
+
+        Note:
+            Reads bypass `Spreadsheet._execute_with_retry`, so transient
+            errors (HTTP 429, 5xx) propagate immediately without retry. See
+            `docs/user-guide/errors.md` ("Writes retry — reads do not") for
+            the full policy.
         """
         if self._local_preview:
             raise NotImplementedError('read_cell not available in local preview mode')
@@ -184,6 +193,12 @@ class Worksheet:
             values = ws.read_range('V5:V10')
             values = ws.read_range(CellRange.from_string('V5:V10'))
             ```
+
+        Note:
+            Reads bypass `Spreadsheet._execute_with_retry`, so transient
+            errors (HTTP 429, 5xx) propagate immediately without retry. See
+            `docs/user-guide/errors.md` ("Writes retry — reads do not") for
+            the full policy.
         """
         if self._local_preview:
             raise NotImplementedError('read_range not available in local preview mode')
