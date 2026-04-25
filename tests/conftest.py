@@ -36,21 +36,18 @@ def mock_s3_bucket():
 
 @pytest.fixture
 def clear_s3_env():
-    """Clear S3_*/AWS_* env vars for the duration of the test.
+    """Clear AWS_* env vars for the duration of the test.
 
     Keeps tests that assume "no S3 configured" deterministic regardless
     of what env vars the host machine has set. Restores the host's
     original values on teardown.
     """
     keys = [
-        'S3_ACCESS_KEY_ID',
-        'S3_SECRET_ACCESS_KEY',
-        'S3_REGION',
-        'S3_ENDPOINT',
         'AWS_ACCESS_KEY_ID',
         'AWS_SECRET_ACCESS_KEY',
         'AWS_REGION',
         'AWS_DEFAULT_REGION',
+        'AWS_ENDPOINT_URL_S3',
     ]
     saved = {k: os.environ.pop(k, None) for k in keys}
     try:

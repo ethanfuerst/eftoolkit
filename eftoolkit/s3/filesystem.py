@@ -129,26 +129,21 @@ def _resolve_s3_credentials(
 ) -> tuple[str | None, str | None, str | None, str | None]:
     """Resolve S3 credentials with the shared precedence chain.
 
-    For each field, precedence is:
-    explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
-    For ``region``, the ``AWS_*`` step is itself a chain:
-    ``AWS_REGION`` > ``AWS_DEFAULT_REGION`` (matches boto3's own ordering).
-    ``endpoint`` has no ``AWS_*`` fallback.
+    For each field, precedence is: explicit kwarg > AWS-standard env var.
+    The env vars consulted are ``AWS_ACCESS_KEY_ID``,
+    ``AWS_SECRET_ACCESS_KEY``, and ``AWS_ENDPOINT_URL_S3``. For ``region``,
+    the env-var step is itself a chain: ``AWS_REGION`` >
+    ``AWS_DEFAULT_REGION`` (matches boto3's own ordering).
 
     Returns a 4-tuple of resolved values, any of which may be ``None`` if
     neither the kwarg nor the corresponding env var is set. Does not raise
     — validation is the caller's responsibility.
     """
     return (
-        access_key_id or os.getenv('S3_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID')),
-        secret_access_key
-        or os.getenv('S3_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY')),
-        region
-        or os.getenv(
-            'S3_REGION',
-            os.getenv('AWS_REGION', os.getenv('AWS_DEFAULT_REGION')),
-        ),
-        endpoint or os.getenv('S3_ENDPOINT'),
+        access_key_id or os.getenv('AWS_ACCESS_KEY_ID'),
+        secret_access_key or os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region or os.getenv('AWS_REGION', os.getenv('AWS_DEFAULT_REGION')),
+        endpoint or os.getenv('AWS_ENDPOINT_URL_S3'),
     )
 
 
@@ -156,19 +151,23 @@ class S3FileSystem:
     """S3 filesystem client for reading/writing parquet files.
 
     For each credential field, precedence is:
-    explicit kwarg > ``S3_*`` env var > ``AWS_*`` env var (where applicable).
+    explicit kwarg > AWS-standard env var.
 
-    +---------------------+--------------------------+--------------------------------------------+
-    | Field               | Primary env var          | Fallback env var(s)                        |
-    +=====================+==========================+============================================+
-    | access_key_id       | ``S3_ACCESS_KEY_ID``     | ``AWS_ACCESS_KEY_ID``                      |
-    +---------------------+--------------------------+--------------------------------------------+
-    | secret_access_key   | ``S3_SECRET_ACCESS_KEY`` | ``AWS_SECRET_ACCESS_KEY``                  |
-    +---------------------+--------------------------+--------------------------------------------+
-    | region              | ``S3_REGION``            | ``AWS_REGION`` then ``AWS_DEFAULT_REGION`` |
-    +---------------------+--------------------------+--------------------------------------------+
-    | endpoint            | ``S3_ENDPOINT``          | — (no fallback)                            |
-    +---------------------+--------------------------+--------------------------------------------+
+    +---------------------+--------------------------------------------------+
+    | Field               | Env var                                          |
+    +=====================+==================================================+
+    | access_key_id       | ``AWS_ACCESS_KEY_ID``                            |
+    +---------------------+--------------------------------------------------+
+    | secret_access_key   | ``AWS_SECRET_ACCESS_KEY``                        |
+    +---------------------+--------------------------------------------------+
+    | region              | ``AWS_REGION`` then ``AWS_DEFAULT_REGION``       |
+    +---------------------+--------------------------------------------------+
+    | endpoint            | ``AWS_ENDPOINT_URL_S3``                          |
+    +---------------------+--------------------------------------------------+
+
+    Legacy ``S3_*`` env var names (``S3_ACCESS_KEY_ID``,
+    ``S3_SECRET_ACCESS_KEY``, ``S3_REGION``, ``S3_ENDPOINT``) are no longer
+    consulted; rename to the AWS-standard names above.
 
     ``AWS_SESSION_TOKEN`` and ``AWS_PROFILE`` are not read — if you need
     session credentials or profile-based auth, construct a
@@ -187,14 +186,14 @@ class S3FileSystem:
 
         Args:
             access_key_id: S3 access key ID. Falls back to
-                ``S3_ACCESS_KEY_ID``, then ``AWS_ACCESS_KEY_ID``.
+                ``AWS_ACCESS_KEY_ID``.
             secret_access_key: S3 secret access key. Falls back to
-                ``S3_SECRET_ACCESS_KEY``, then ``AWS_SECRET_ACCESS_KEY``.
-            region: AWS region. Falls back to ``S3_REGION``, then
-                ``AWS_REGION``, then ``AWS_DEFAULT_REGION``.
+                ``AWS_SECRET_ACCESS_KEY``.
+            region: AWS region. Falls back to ``AWS_REGION``, then
+                ``AWS_DEFAULT_REGION``.
             endpoint: Custom S3 endpoint (e.g.,
                 ``'nyc3.digitaloceanspaces.com'``). Falls back to
-                ``S3_ENDPOINT``.
+                ``AWS_ENDPOINT_URL_S3``.
 
         Raises:
             ValueError: If no access key and secret can be resolved from
@@ -210,7 +209,7 @@ class S3FileSystem:
         if not self.access_key_id or not self.secret_access_key:
             raise ValueError(
                 'S3 credentials required. Pass access_key_id/secret_access_key '
-                'or set S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY environment variables.'
+                'or set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables.'
             )
 
     def _get_client(self):
